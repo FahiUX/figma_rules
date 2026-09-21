@@ -59,12 +59,21 @@ NEVER use `border-b pb-*` or `border-t pt-*` on Auto Layout headers or section c
 </div>
 ```
 
+### 5. Strict Ban on `max-w-*` (The Max-Width Trap)
+NEVER use `max-w-*` (`max-w-2xl`, `max-w-xl`, `max-w-md`, `max-w-[300px]`, `max-w-7xl mx-auto`) on layout elements, cards, or text stacks.
+- **Why**: Figma Auto Layout does not have standard fluid CSS max-width. Exporters convert `max-w-*` into **rigid fixed-width frames** (e.g. `max-w-2xl` becomes a hardcoded `width = 672px` frame). When placed in a wider Figma artboard or resized, the frame refuses to stretch, creating awkward dead space on the canvas.
+- **Rules**:
+  * **On Page Containers**: Use `w-full` with padding (`px-6 md:px-10`), or let the root Figma screen artboard (e.g. 1440px) define boundaries. Ban `max-w-7xl mx-auto`.
+  * **On Columns / Hero Banners**: Use `flex-1` or explicit fixed width columns (`w-[380px] shrink-0`), NEVER `max-w-2xl`.
+  * **On Text / Paragraphs**: Let text wrap naturally within its `w-full self-stretch` container.
+  * **On Truncated Table Cells**: Use `flex-1 min-w-0 truncate`, NEVER `max-w-[200px]`.
+
 ---
 
 ## Specific Component Architectures
 
 ### A. Multi-Card / KPI Metrics Rows (3–6 Columns)
-Never use CSS Grid. Use horizontal flex with `w-full flex-1 min-w-0` and `items-stretch` on each card, and `w-full self-stretch` on all inner stacks:
+Never use CSS Grid or `max-w-*`. Use horizontal flex with `w-full flex-1 min-w-0` and `items-stretch` on each card, and `w-full self-stretch` on all inner stacks:
 ```tsx
 {/* PARENT: [Auto Layout: Horizontal] [Gap: 16px] [Width: Fill] */}
 <div className="w-full flex flex-row items-stretch gap-4">
@@ -97,7 +106,7 @@ To support effortless column width adjustments in Figma, construct tables using 
 3. **Cells**: Every cell in a column MUST be:
    - `w-full self-stretch` (Fill container)
    - Fixed height (`h-[40px]` for headers, `h-[72px]` for data rows)
-   - Inner text wrapped in `flex-1 min-w-0 truncate` so long text never breaks row heights.
+   - Inner text wrapped in `flex-1 min-w-0 truncate` so long text never breaks row heights (no `max-w-*`).
 
 ```tsx
 <div className="w-full flex flex-row items-stretch border border-neutral-200 rounded-2xl overflow-hidden">
@@ -151,9 +160,10 @@ Web charts (Chart.js, Canvas, complex libraries) frequently export into Figma as
 ---
 
 ## Clean Export Guardians
+- **No `max-w-*`**: Ban all `max-w-*` constraints. Use `w-full flex-1 self-stretch` (Fill) or explicit fixed widths (`w-[380px] shrink-0`).
+- **No `items-baseline`**: Figma Auto Layout has no baseline mode. Exporters fall back to `position: absolute` with manual coordinates. Always use `items-center`.
 - **No Pseudo-elements**: Avoid `::before` and `::after` for UI elements (exporters drop them). Use explicit semantic HTML/JSX tags.
 - **No `ml-auto`**: Never use margin-auto to push items. Use `justify-between` or wrap the items in two separate Auto Layout frames.
-- **No `items-baseline`**: Figma Auto Layout does not have a baseline alignment mode. Exporters fall back to `position: absolute` with manual coordinates. Always use `items-center`.
 - **Explicit Dividers**: Never combine `border-b` with `pb-*` on containers. Use separate 1px divider elements `<div className="w-full h-px bg-..." />`.
 - **Force Fill with `items-stretch` and `self-stretch`**: All card containers must declare `items-stretch` and their children must declare `self-stretch` so Figma sets `layoutAlign = "STRETCH"` (Width: Fill container) and never calculates a fixed pixel width.
 - **Absolute Positioning**: Only use `absolute` when positioned relative to an explicit `relative` parent (e.g. badge on an avatar).
