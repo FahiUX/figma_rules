@@ -7,7 +7,7 @@ description: Enforces strict Figma Auto Layout architecture for frontend code (R
 
 This skill enforces strict 1:1 parity between frontend code (`.tsx`, React, Tailwind CSS, HTML) and **Figma Auto Layout & Native Vector Architecture**.
 
-When this skill is active, the agent writes code specifically engineered to export cleanly into Figma via tools like `html.to.design`, Builder.io, or DOM inspectors without broken layouts, unexpected margins, un-grouped frames, or rasterized charts.
+When this skill is active, the agent writes code specifically engineered to export cleanly into Figma via tools like Claude `html->figma`, `html.to.design`, Builder.io, or DOM inspectors without broken layouts, unexpected margins, asymmetrical padding, un-grouped frames, or rasterized charts.
 
 ---
 
@@ -27,39 +27,66 @@ Figma has only two spacing concepts: **Item Spacing (Gap)** and **Frame Padding*
 - **BANNED**: `mt-*`, `mb-*`, `ml-*`, `mr-*` for layout spacing.
 - **BANNED**: Empty spacer divs like `<div className="h-4" />`.
 
-### 3. Sizing Constraints: 1:1 Figma Mapping
+### 3. Sizing Constraints: 1:1 Figma Mapping (Hug vs Fill vs Fixed)
 Every JSX element must explicitly declare its resizing behavior:
-- **Fill Container**: Use `flex-1` (inside flex parent) or `w-full`.
+- **Fill Container**: Use `w-full flex-1 min-w-0` (inside flex parent) or `w-full`.
   * *Use for*: Text containers, cards in a responsive row, table cells, full-width inputs.
+  * **CRITICAL**: Inner vertical stacks (`flex flex-col`) inside cards MUST declare `w-full`. Otherwise Figma exporters set them to "Hug contents" or fixed width, creating dead empty space on the right of the card.
 - **Hug Contents**: Use `w-fit`, `h-fit`, or `inline-flex`.
   * *Use for*: Buttons, pills, badges, tags, chip filters.
 - **Fixed Dimensions**: Use explicit Tailwind sizing (e.g., `w-11 h-11`, `w-[320px]`).
-  * *Use ONLY for*: Avatars, icons, fixed-width sidebars, or fixed table columns.
+  * *Use ONLY for*: Avatars, icons, fixed-width sidebars, or fixed table columns. Always add `shrink-0`.
+
+### 4. Dividers: Strict Ban on Single-Sided Padding for Borders
+NEVER use `border-b pb-*` or `border-t pt-*` on Auto Layout headers or section cards.
+- **Why**: Exporters convert `border-b pb-4` into asymmetrical padding (`T: 0, R: 0, B: 16, L: 0`) on the Auto Layout frame, which frustrates Figma designers and breaks component standards.
+- **Rule**: Keep frame padding uniform or 0, and use a dedicated 1px divider layer:
+```tsx
+{/* BAD: Creates asymmetrical padding on the frame in Figma */}
+<div className="w-full flex flex-row items-center justify-between border-b border-neutral-200 pb-4">
+  ...
+</div>
+
+{/* GOOD: 1:1 Figma Auto Layout Header + Explicit Vector Divider */}
+<div className="w-full flex flex-col gap-4">
+  <div className="w-full flex flex-row items-center justify-between">
+    <h3>Title</h3>
+    <button>Action</button>
+  </div>
+  <div className="w-full h-px bg-neutral-200 shrink-0" />
+</div>
+```
 
 ---
 
 ## Specific Component Architectures
 
-### A. Multi-Card / KPI Metrics Rows (4–6 Columns)
-Never use CSS Grid. Use horizontal flex with `flex-1` on each card so all cards stretch equally:
+### A. Multi-Card / KPI Metrics Rows (3–6 Columns)
+Never use CSS Grid. Use horizontal flex with `w-full flex-1 min-w-0` on each card and `w-full` on all inner text stacks:
 ```tsx
-// PARENT: [Auto Layout: Horizontal] [Gap: 16px] [Width: Fill]
+{/* PARENT: [Auto Layout: Horizontal] [Gap: 16px] [Width: Fill] */}
 <div className="w-full flex flex-row items-stretch gap-4">
-  {/* CHILDREN: Each card is flex-1 (Figma Width: Fill Container) */}
-  <div className="flex-1 flex flex-col gap-2 p-5 rounded-2xl bg-white border border-neutral-200">
-    <span className="text-xs text-neutral-500 font-medium">Metric Title</span>
-    <span className="text-2xl font-bold text-neutral-900">Value</span>
+  {/* CHILDREN: Each card is w-full flex-1 min-w-0 (Figma Width: Fill Container) */}
+  <div className="w-full flex-1 min-w-0 flex flex-col gap-3 p-5 rounded-2xl bg-white border border-neutral-200">
+    <div className="w-full flex flex-row items-center justify-between">
+      <span className="text-xs text-neutral-500 font-medium">Metric Title</span>
+      <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">📈</span>
+    </div>
+    {/* Inner Text Stack MUST have w-full */}
+    <div className="w-full flex flex-col gap-1">
+      <span className="text-2xl font-bold text-neutral-900">Value</span>
+      <span className="text-xs text-neutral-500">Supporting subtitle</span>
+    </div>
   </div>
 </div>
 ```
-If fixed-width cards with automatic spacing are needed, use `justify-between` (Figma: Gap set to "Auto").
 
 ---
 
 ### B. Tables: Column-Based Auto Layout
 To support effortless column width adjustments in Figma, construct tables using column stacks rather than row-based markup:
 1. **Parent Frame**: `flex flex-row items-stretch`
-2. **Column Frames**: `flex flex-col` with explicit column width (`w-[270px]`, `w-[200px]`, or `flex-1`).
+2. **Column Frames**: `flex flex-col` with explicit column width (`w-[270px]`, `w-[200px]`, or `w-full flex-1 min-w-0`).
 3. **Cells**: Every cell in a column MUST be:
    - `w-full` (Fill container)
    - Fixed height (`h-[40px]` for headers, `h-[72px]` for data rows)
@@ -116,7 +143,9 @@ Web charts (Chart.js, Canvas, complex libraries) frequently export into Figma as
 
 ---
 
-### D. Clean Export Guardians
+## Clean Export Guardians
 - **No Pseudo-elements**: Avoid `::before` and `::after` for UI elements (exporters drop them). Use explicit semantic HTML/JSX tags.
 - **No `ml-auto`**: Never use margin-auto to push items. Use `justify-between` or wrap the items in two separate Auto Layout frames.
+- **Explicit Dividers**: Never combine `border-b` with `pb-*` on containers. Use separate 1px divider elements `<div className="w-full h-px bg-..." />`.
+- **Inner Stacks Fill**: Always give nested `flex flex-col` text containers `w-full` so they don't hug or create empty right-side space.
 - **Absolute Positioning**: Only use `absolute` when positioned relative to an explicit `relative` parent (e.g. badge on an avatar).
