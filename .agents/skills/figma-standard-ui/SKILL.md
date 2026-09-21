@@ -68,6 +68,19 @@ NEVER use `max-w-*` (`max-w-2xl`, `max-w-xl`, `max-w-md`, `max-w-[300px]`, `max-
   * **On Text / Paragraphs**: Let text wrap naturally within its `w-full self-stretch` container.
   * **On Truncated Table Cells**: Use `flex-1 min-w-0 truncate`, NEVER `max-w-[200px]`.
 
+### 6. Text Layer Standard: "Fit to Fill" (Auto Height & Fill Container)
+In Figma, text layers inside Auto Layout cards and containers must be set to:
+- **Horizontal Resizing: Fill Container (`layoutAlign = "STRETCH"`)**
+- **Vertical Resizing: Hug Contents (Auto Height)**
+- **Why**:
+  - If a text layer is set to "Auto width" (Hug contents horizontally), it refuses to wrap when the parent frame shrinks, overflowing outside the card or forcing the parent to freeze at a narrow width.
+  - If set to "Fixed size", editing the copy in Figma either clips the text or creates empty space.
+  - "Fit to Fill" (Fill horizontally, Hug vertically) ensures text reflows responsively to whatever width the parent frame has.
+- **Rules**:
+  * **Headings & Paragraphs**: Must always declare `w-full self-stretch` (e.g. `<h3 className="w-full self-stretch text-lg ...">`, `<p className="w-full self-stretch text-sm ...">`).
+  * **Text inside Flex Rows**: When text sits next to an icon, pill, or button, wrap the text stack in `flex-1 min-w-0` so it expands to fill remaining space.
+  * **BANNED**: `whitespace-nowrap` on descriptive text or body paragraphs. Only pills, badges, and tags are allowed to have `whitespace-nowrap w-fit`.
+
 ---
 
 ## Specific Component Architectures
@@ -84,7 +97,7 @@ Never use CSS Grid or `max-w-*`. Use horizontal flex with `w-full flex-1 min-w-0
       <span className="text-xs text-neutral-500 font-medium">Metric Title</span>
       <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">📈</span>
     </div>
-    {/* Inner Text Stack: self-stretch + items-stretch */}
+    {/* Inner Text Stack: self-stretch + items-stretch (Fit to Fill) */}
     <div className="w-full self-stretch flex flex-col items-stretch gap-1">
       {/* Value Row: items-center (NEVER items-baseline) */}
       <div className="w-full self-stretch flex flex-row items-center gap-2">
@@ -160,6 +173,7 @@ Web charts (Chart.js, Canvas, complex libraries) frequently export into Figma as
 ---
 
 ## Clean Export Guardians
+- **Fit to Fill Text**: All titles, headings, and paragraphs must have `w-full self-stretch` so text layers export with **Horizontal: Fill container** and **Vertical: Hug contents (Auto height)**.
 - **No `max-w-*`**: Ban all `max-w-*` constraints. Use `w-full flex-1 self-stretch` (Fill) or explicit fixed widths (`w-[380px] shrink-0`).
 - **No `items-baseline`**: Figma Auto Layout has no baseline mode. Exporters fall back to `position: absolute` with manual coordinates. Always use `items-center`.
 - **No Pseudo-elements**: Avoid `::before` and `::after` for UI elements (exporters drop them). Use explicit semantic HTML/JSX tags.
