@@ -1,6 +1,6 @@
 # Figma-Standard UI Architecture Rules
 
-When writing UI code (.tsx, React, Tailwind CSS, HTML), strictly mirror Figma Auto Layout:
+When writing UI code (.tsx, React, Tailwind CSS, HTML), strictly mirror Figma Auto Layout & Vector Architecture:
 
 1. AUTO LAYOUT ONLY (NO CSS GRID):
    - Always use `flex flex-col` (Vertical Frame) or `flex flex-row` (Horizontal Frame).
@@ -22,7 +22,13 @@ When writing UI code (.tsx, React, Tailwind CSS, HTML), strictly mirror Figma Au
    - Every cell in a column MUST have `w-full` and consistent fixed height so rows line up.
    - Text inside cells must use `flex-1 min-w-0 truncate`.
 
-5. EXPORT GUARDIANS:
+5. CHARTS & DATA VISUALIZATION (THE FIGMA-VECTOR TECHNIQUE):
+   - NEVER use `<canvas>` (it rasterizes into flat blurry images in Figma).
+   - Use semantic SVG `<path>` for trend lines (converts to editable Figma Vector paths).
+   - Use `<defs><linearGradient>` for area fills (converts to native Figma gradient fills).
+   - Put X-axis labels in an HTML Auto Layout flex row directly below the SVG (`flex flex-row justify-between w-full`), NOT inside `<text>` tags with manual absolute coordinates.
+
+6. EXPORT GUARDIANS:
    - No `::before` / `::after` pseudo-elements (use real JSX tags).
    - No `ml-auto` (use `justify-between` on the parent).
    - Absolute positioning ONLY on children of an explicit `relative` parent.
