@@ -29,9 +29,11 @@ Figma has only two spacing concepts: **Item Spacing (Gap)** and **Frame Padding*
 
 ### 3. Sizing Constraints: 1:1 Figma Mapping (Hug vs Fill vs Fixed)
 Every JSX element must explicitly declare its resizing behavior:
-- **Fill Container**: Use `w-full flex-1 min-w-0` (inside flex parent) or `w-full`.
-  * *Use for*: Text containers, cards in a responsive row, table cells, full-width inputs.
-  * **CRITICAL**: Inner vertical stacks (`flex flex-col`) inside cards MUST declare `w-full`. Otherwise Figma exporters set them to "Hug contents" or fixed width, creating dead empty space on the right of the card.
+- **Fill Container (`layoutAlign = "STRETCH"`)**:
+  * **Card Container**: Must declare `items-stretch` so the counter-axis alignment is `STRETCH` (not `items-start`).
+  * **Card in Row**: Use `w-full flex-1 min-w-0`.
+  * **Inner Stacks & Children inside Cards**: MUST declare `w-full self-stretch flex flex-col items-stretch`.
+  * *Why this is critical*: If `self-stretch` or `items-stretch` is omitted, Figma exporters default the counter-axis to `MIN` (`items-start`) and lock nested text containers to fixed pixel widths based on text length (e.g., 201px), leaving massive empty space on the right of the card.
 - **Hug Contents**: Use `w-fit`, `h-fit`, or `inline-flex`.
   * *Use for*: Buttons, pills, badges, tags, chip filters.
 - **Fixed Dimensions**: Use explicit Tailwind sizing (e.g., `w-11 h-11`, `w-[320px]`).
@@ -62,20 +64,25 @@ NEVER use `border-b pb-*` or `border-t pt-*` on Auto Layout headers or section c
 ## Specific Component Architectures
 
 ### A. Multi-Card / KPI Metrics Rows (3–6 Columns)
-Never use CSS Grid. Use horizontal flex with `w-full flex-1 min-w-0` on each card and `w-full` on all inner text stacks:
+Never use CSS Grid. Use horizontal flex with `w-full flex-1 min-w-0` and `items-stretch` on each card, and `w-full self-stretch` on all inner stacks:
 ```tsx
 {/* PARENT: [Auto Layout: Horizontal] [Gap: 16px] [Width: Fill] */}
 <div className="w-full flex flex-row items-stretch gap-4">
-  {/* CHILDREN: Each card is w-full flex-1 min-w-0 (Figma Width: Fill Container) */}
-  <div className="w-full flex-1 min-w-0 flex flex-col gap-3 p-5 rounded-2xl bg-white border border-neutral-200">
-    <div className="w-full flex flex-row items-center justify-between">
+  {/* CHILDREN: Each card is items-stretch with w-full flex-1 min-w-0 */}
+  <div className="w-full flex-1 min-w-0 flex flex-col items-stretch justify-between gap-3 p-5 rounded-2xl bg-white border border-neutral-200">
+    {/* Header row: self-stretch */}
+    <div className="w-full self-stretch flex flex-row items-center justify-between">
       <span className="text-xs text-neutral-500 font-medium">Metric Title</span>
       <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">📈</span>
     </div>
-    {/* Inner Text Stack MUST have w-full */}
-    <div className="w-full flex flex-col gap-1">
-      <span className="text-2xl font-bold text-neutral-900">Value</span>
-      <span className="text-xs text-neutral-500">Supporting subtitle</span>
+    {/* Inner Text Stack: self-stretch + items-stretch */}
+    <div className="w-full self-stretch flex flex-col items-stretch gap-1">
+      {/* Value Row: items-center (NEVER items-baseline) */}
+      <div className="w-full self-stretch flex flex-row items-center gap-2">
+        <span className="text-3xl font-extrabold text-neutral-900">Value</span>
+        <span className="text-xs font-bold text-emerald-600">Badge</span>
+      </div>
+      <p className="w-full self-stretch text-xs text-neutral-500">Supporting subtitle</p>
     </div>
   </div>
 </div>
@@ -88,7 +95,7 @@ To support effortless column width adjustments in Figma, construct tables using 
 1. **Parent Frame**: `flex flex-row items-stretch`
 2. **Column Frames**: `flex flex-col` with explicit column width (`w-[270px]`, `w-[200px]`, or `w-full flex-1 min-w-0`).
 3. **Cells**: Every cell in a column MUST be:
-   - `w-full` (Fill container)
+   - `w-full self-stretch` (Fill container)
    - Fixed height (`h-[40px]` for headers, `h-[72px]` for data rows)
    - Inner text wrapped in `flex-1 min-w-0 truncate` so long text never breaks row heights.
 
@@ -146,6 +153,7 @@ Web charts (Chart.js, Canvas, complex libraries) frequently export into Figma as
 ## Clean Export Guardians
 - **No Pseudo-elements**: Avoid `::before` and `::after` for UI elements (exporters drop them). Use explicit semantic HTML/JSX tags.
 - **No `ml-auto`**: Never use margin-auto to push items. Use `justify-between` or wrap the items in two separate Auto Layout frames.
+- **No `items-baseline`**: Figma Auto Layout does not have a baseline alignment mode. Exporters fall back to `position: absolute` with manual coordinates. Always use `items-center`.
 - **Explicit Dividers**: Never combine `border-b` with `pb-*` on containers. Use separate 1px divider elements `<div className="w-full h-px bg-..." />`.
-- **Inner Stacks Fill**: Always give nested `flex flex-col` text containers `w-full` so they don't hug or create empty right-side space.
+- **Force Fill with `items-stretch` and `self-stretch`**: All card containers must declare `items-stretch` and their children must declare `self-stretch` so Figma sets `layoutAlign = "STRETCH"` (Width: Fill container) and never calculates a fixed pixel width.
 - **Absolute Positioning**: Only use `absolute` when positioned relative to an explicit `relative` parent (e.g. badge on an avatar).
