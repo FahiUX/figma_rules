@@ -23,14 +23,36 @@ This skill forces AI agents to code strictly using **Figma's Auto Layout mental 
 
 ## How to Install on Your Home PC 🏠
 
-Run this single command in your terminal on your home machine:
+### 1. Install Globally (For All Agents & Workspaces)
+```bash
+npx skills add FahiUX/figma_rules -g
+```
 
+If you want to auto-confirm without prompts and install to all agents:
+```bash
+npx skills add FahiUX/figma_rules -g --all
+```
+
+---
+
+### 2. Install to Current Project Only
+If you only want it inside a specific project folder:
 ```bash
 npx skills add FahiUX/figma_rules
 ```
 
-Or clone directly into your global agent skills folder:
+---
 
+### 3. Updating When You Push New Rules
+Whenever we update or add new rules to your GitHub repo, you can update it at home with:
+```bash
+npx skills update figma-standard-ui -g
+```
+
+---
+
+## Alternative: Manual Git Clone
+Clone directly into your global agent skills folder:
 ```bash
 git clone https://github.com/FahiUX/figma_rules.git ~/.agents/skills/figma-standard-ui
 ```
@@ -42,3 +64,4 @@ git clone https://github.com/FahiUX/figma_rules.git ~/.agents/skills/figma-stand
 1. **Via Skill**: Ask your agent:
    > *"Build this dashboard using figma standard"*
 2. **Via Repository Rule**: Copy `AGENTS.md` into the root of any web project so your agent automatically applies these rules on every prompt.
+
