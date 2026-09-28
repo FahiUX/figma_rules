@@ -2,56 +2,57 @@
 
 When writing UI code (.tsx, React, Tailwind CSS, HTML), strictly mirror Figma Auto Layout & Vector Architecture:
 
-1. AUTO LAYOUT ONLY (NO CSS GRID):
-   - Always use `flex flex-col` (Vertical Frame) or `flex flex-row` (Horizontal Frame).
-   - NEVER use `display: grid` or `grid-cols-*`. For responsive card rows, use `flex flex-row gap-4` with `w-full flex-1 min-w-0` on children (Fill container).
+1. **DESKTOP VIEWPORT REFERENCE STANDARD (1440px):**
+   - Base artboard target is **1440px desktop width** (`1440 × 900+` or `1440 × Hug`). Keep React code responsive (`w-full flex-1 min-w-0`), but ensure all 3-4 card grids, sidebars (`w-[280px]`), and work area margins resolve with optical balance at 1440px.
 
-2. SPACING (GAP & PADDING ONLY):
-   - Use ONLY `gap-*` for spacing between sibling elements.
+2. **MAIN CONTAINER RESIZING (HEIGHT: HUG):**
+   - Root screen wrapper and main content container MUST set **`Height: HUG`** (`layoutSizingVertical = "HUG"` / `min-h-screen h-auto flex flex-col`). Never use fixed pixel heights (like `h-[900px]` or `1323px`) that cause content clipping or scroll traps.
+
+3. **CANVAS CONTENT PADDING (40px ALL-AROUND):**
+   - The primary work area / canvas content container MUST consistently declare **`40px` padding on all 4 sides** (`p-10` / `Top: 40px, Right: 40px, Bottom: 40px, Left: 40px`).
+
+4. **PIXEL UNITS PREFERRED (`px` OVER `rem`):**
+   - Use explicit pixel values (`h-[72px]`, `w-[280px]`, `p-10` [40px], `gap-8` [32px], `gap-6` [24px]) to avoid fractional font-scaling drift (`15.98px`, `39.87px`) during vector conversion.
+
+5. **AUTO LAYOUT ONLY (NO CSS GRID):**
+   - Always use `flex flex-col` (Vertical Frame) or `flex flex-row` (Horizontal Frame).
+   - NEVER use `display: grid` or `grid-cols-*`. For responsive card rows, use `flex flex-row gap-6` with `w-full flex-1 min-w-0` on children (Fill container).
+
+6. **SPACING (GAP & PADDING ONLY):**
+   - Use ONLY `gap-*` for spacing between sibling elements and row containers.
    - Use ONLY `p-*`, `px-*`, `py-*` for padding on parent containers.
    - STRICTLY BANNED: Margins (`mt-*`, `mb-*`, `ml-*`, `mr-*`) for layout spacing.
    - STRICTLY BANNED: Empty spacer `<div />` elements.
 
-3. SIZING CONSTRAINTS (FILL VS HUG VS FIXED):
+7. **SIZING CONSTRAINTS (FILL VS HUG VS FIXED):**
    - Card Containers: Must declare `items-stretch` (`counterAxisAlignItems = "STRETCH"`).
-   - Inner stacks & text containers: MUST declare `w-full self-stretch flex flex-col items-stretch` (`layoutAlign = "STRETCH"`). Without `self-stretch` and `items-stretch`, Figma exporters set the counter-axis to `items-start` and freeze inner frames to narrow fixed pixel widths (e.g. 201px), leaving dead whitespace on the right.
-   - Hug Contents   -> `w-fit`, `h-fit`, or `inline-flex` (buttons, badges, pills)
-   - Fixed Size     -> Explicit `w-11 h-11`, `w-[320px] shrink-0` (only for avatars, icons, fixed sidebars)
+   - Inner stacks & text containers: MUST declare `w-full self-stretch flex flex-col items-stretch` (`layoutAlign = "STRETCH"`).
+   - Hug Contents -> `w-fit`, `h-fit`, or `inline-flex` (buttons, badges, pills).
+   - Fixed Size -> Explicit `w-11 h-11`, `w-[320px] shrink-0` (only for avatars, icons, fixed sidebars).
 
-4. STRICT BAN ON `max-w-*` (MAX-WIDTH TRAP):
+8. **STRICT BAN ON `max-w-*` (MAX-WIDTH TRAP):**
    - NEVER use `max-w-*` (`max-w-2xl`, `max-w-xl`, `max-w-md`, `max-w-[300px]`, `max-w-7xl mx-auto`).
-   - Exporters convert `max-w-*` into rigid, hardcoded fixed-pixel boxes in Figma (e.g. 672px), which breaks responsive Auto Layout stretching and creates dead canvas space.
    - Use `w-full flex-1 self-stretch` for filling space, `w-[fixed] shrink-0` for fixed columns, and `flex-1 min-w-0 truncate` for truncated text.
 
-5. TEXT LAYER STANDARD: "FIT TO FILL" (AUTO HEIGHT & FILL CONTAINER):
-   - In Figma, text layers inside Auto Layout cards and containers MUST have:
-     * Horizontal: Fill Container (`layoutAlign = "STRETCH"`)
-     * Vertical: Hug Contents (Auto Height)
-   - In code, all headings (`h1`–`h6`) and body paragraphs (`p`) MUST declare `w-full self-stretch`.
-   - When text sits next to an icon or button in a row, wrap the text stack in `flex-1 min-w-0` to expand to fill available space.
-   - STRICTLY BANNED: `whitespace-nowrap` on descriptive text or body paragraphs (forces text layers to fixed width or causes overflow).
+9. **TEXT LAYER STANDARD: "FIT TO FILL" (AUTO HEIGHT & FILL CONTAINER):**
+   - Horizontal: Fill Container (`layoutAlign = "STRETCH"`), Vertical: Hug Contents (Auto Height).
+   - In code: all headings (`h1`–`h6`) and body paragraphs (`p`) MUST declare `w-full self-stretch`.
+   - Wrap row text stacks in `flex-1 min-w-0`. STRICTLY BANNED: `whitespace-nowrap` on paragraphs.
 
-6. DIVIDERS & BORDERS (NO ASYMMETRICAL PADDING):
-   - NEVER use `border-b pb-*` or `border-t pt-*` on container frames. Exporters convert this into asymmetrical padding (`T:0, R:0, B:16, L:0`) in Figma.
-   - Keep parent frame padding clean/uniform and use a dedicated 1px divider layer:
-     `<div className="w-full h-px bg-neutral-200 shrink-0" />`
+10. **DIVIDERS & BORDERS (NO ASYMMETRICAL PADDING):**
+    - NEVER use `border-b pb-*` or `border-t pt-*` on container frames.
+    - Use dedicated 1px divider layers: `<div className="w-full h-px bg-neutral-200 shrink-0" />`.
 
-7. TABLE ARCHITECTURE:
-   - Use Column-Based Auto Layout (Parent `flex-row` -> Column `flex-col` -> Cells `w-full self-stretch h-[fixed]`).
-   - Every cell in a column MUST have `w-full self-stretch` and consistent fixed height so rows line up.
-   - Text inside cells must use `flex-1 min-w-0 truncate` (no `max-w-*`).
+11. **MULTI-LEVEL NESTED HIERARCHY & ADVANCED AL:**
+    - **Multi-Level Inception**: Tier 1 Atoms $\to$ Tier 2 Molecules $\to$ Tier 3 Organisms/Cards $\to$ Tier 4 Sections $\to$ Tier 5 Canvas.
+    - **Absolute Positioning in AL**: `relative` parent with `absolute` child for floating badges/status pips without breaking Auto Layout.
+    - **Wrap Grids**: `flex flex-row flex-wrap gap-2.5` with `w-fit h-fit shrink-0 whitespace-nowrap` chips for responsive tag clouds.
+    - **Stacking Order & Stroke**: `-space-x-2` with `border-2 border-white` (`strokeAlign: OUTSIDE`) for crisp avatar clusters.
 
-8. CHARTS & DATA VISUALIZATION (THE FIGMA-VECTOR TECHNIQUE):
-   - NEVER use `<canvas>` (it rasterizes into flat blurry images in Figma).
-   - Use semantic SVG `<path>` for trend lines (converts to editable Figma Vector paths).
-   - Use `<defs><linearGradient>` for area fills (converts to native Figma gradient fills).
-   - Put X-axis labels in an HTML Auto Layout flex row directly below the SVG (`flex flex-row justify-between w-full`), NOT inside `<text>` tags with manual absolute coordinates.
+12. **ICON CONSTRAINTS & RADIUS CAPS:**
+    - Square bounding boxes (`16×16`, `20×20`, `24×24`, `80×80` `shrink-0`) with `Constraints: LEFT and TOP`.
+    - Corner radius capped to $\le 9999\text{px}$ (banning float32 `3.40282e+38` overflow).
 
-9. EXPORT GUARDIANS:
-   - Fit to Fill text layers (`w-full self-stretch` on headings and paragraphs; no `whitespace-nowrap`).
-   - No `max-w-*` on layout, text, or card containers.
-   - No `items-baseline` (Figma Auto Layout has no baseline mode; exporters fall back to `position: absolute`). Always use `items-center`.
-   - No `::before` / `::after` pseudo-elements (use real JSX tags).
-   - No `ml-auto` (use `justify-between` on the parent).
-   - Absolute positioning ONLY on children of an explicit `relative` parent.
-
+13. **TABLE & CHART ARCHITECTURE:**
+    - Column-Based Auto Layout (Parent `flex-row` $\to$ Column `flex-col` $\to$ Cells `w-full self-stretch h-[fixed]`).
+    - Native SVG Vector paths (`<path>`, `<defs><linearGradient>`, `<circle>`) with Auto Layout flex rows for X-axis labels (NO `<canvas>`).
