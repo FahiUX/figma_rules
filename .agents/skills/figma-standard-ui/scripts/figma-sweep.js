@@ -53,6 +53,11 @@ for (const n of [root, ...root.findAll(() => true)]) {
   if ('minWidth' in n && n.minWidth != null) { n.minWidth = null; log.minMax++; }
   if ('maxWidth' in n && n.maxWidth != null) { n.maxWidth = null; log.minMax++; }
 }
+// absolute overlay pinned across its parent (left+right) exported as Hug -> fixed width so its rows/text can Fill
+for (const n of root.findAll(n => isAL(n) && n.layoutPositioning === 'ABSOLUTE' && n.layoutSizingHorizontal === 'HUG' && n.parent && n.width >= n.parent.width * 0.75)) {
+  n.layoutSizingHorizontal = 'FIXED'; log.frameFill++;
+  for (const k of n.children) if (k.type === 'FRAME' && isAL(k) && k.layoutSizingHorizontal !== 'FILL') k.layoutSizingHorizontal = 'FILL';
+}
 
 // 2. unwrap single-text wrapper frames
 const wrappers = root.findAll(n =>
@@ -75,10 +80,6 @@ function visit(p) {
   if (!('children' in p)) return;
   // keep descending through non-auto-layout frames (e.g. hero cards with an absolute background layer)
   if (!isAL(p)) { for (const k of p.children) if (k.type === 'FRAME') visit(k); return; }
-  // absolute overlay pinned across its parent (left+right) exported as Hug -> fixed width so its text can Fill
-  if (p.layoutPositioning === 'ABSOLUTE' && p.layoutSizingHorizontal === 'HUG' && p.parent && p.width >= p.parent.width * 0.75) {
-    p.layoutSizingHorizontal = 'FIXED'; log.frameFill++;
-  }
   const canFill = p.layoutSizingHorizontal !== 'HUG' || p === root;
   const kids = p.children.filter(k => k.visible && k.layoutPositioning !== 'ABSOLUTE');
   if (canFill && !isPill(p) && !inPill(p)) {
@@ -108,7 +109,7 @@ visit(root);
 // 4. one-line truncation inside short fixed-height cells (tables)
 for (const t of allTexts()) {
   if (inPill(t)) continue;
-  for (let c = t.parent, i = 0; c && i < 2; c = c.parent, i++) {
+  for (let c = t.parent, i = 0; c && i < 3; c = c.parent, i++) {
     if (c.type === 'FRAME' && c.layoutSizingVertical === 'FIXED' && c.height <= 80) { t.textTruncation = 'ENDING'; t.maxLines = 1; log.truncated++; break; }
   }
 }

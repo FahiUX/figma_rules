@@ -137,6 +137,7 @@ Every text layer is set to:
 - **Vertical Resizing: Hug Contents** (`layoutSizingVertical = "HUG"`, `textAutoResize = "HEIGHT"`)
 - **Never** `Hug × Hug` (`WIDTH_AND_HEIGHT`): this is what exporters produce by default for bare `<span>`/`<div>` text, and the layer stops reflowing when the card resizes.
 - **Never** a fixed width or a fixed height on text.
+- **No `w-fit` on non-button text** (labels, legend items, route text): it exports Hug and the sweep can only guess which text in the row should Fill. Use `flex-1 min-w-0` for the label; `w-fit whitespace-nowrap` is only for buttons, badges, pills and the value after a label.
 - **The only exception** is text inside a Button or Badge/Pill, which stays Hug × Hug (`whitespace-nowrap w-fit`).
 - **Container → Text, both Fill horizontal**: when text sits inside an auto layout container, the text is **Fill** and its container is **Fill** horizontally as well. Fill needs a Fill parent: a Fill text inside a Hug container still shrinks to the text's width. Every wrapper from the text up to the card must be Fill horizontal.
   * In a vertical stack, the wrapper uses `w-full self-stretch`.
@@ -299,7 +300,8 @@ Web charts frequently export into Figma as flat blurry PNG bitmaps or fragmented
    - Area fill: `<path d="..." fill="url(#grad)" />` with `<defs><linearGradient>` (exports to a native Figma vector with gradient fill).
    - Data points: `<circle cx="..." cy="..." r="..." />` (exports to Figma Ellipses).
    - Gridlines: `<line strokeDasharray="4 4" />` (exports to Figma dashed vectors).
-3. **Axis Labels in Auto Layout (NOT in SVG)**:
+3. **No SVG `<text>`**: the converter exports SVG text in **Inter** (banned font). Threshold labels, axis labels and legends go in HTML.
+4. **Axis Labels in Auto Layout (NOT in SVG)**:
    - Place X-axis labels in a clean HTML Auto Layout flex row directly below the SVG (`flex flex-row justify-between w-full`) so they export as a responsive Auto Layout text row.
 
 ```tsx
@@ -329,7 +331,7 @@ Web charts frequently export into Figma as flat blurry PNG bitmaps or fragmented
 
 Every screen goes into Figma through the **html->figma capture** (Figma MCP `generate_figma_design`), followed by the sweep. Never hand-build a screen that exists in code.
 
-1. **Fresh dev server.** On WSL with the repo under `/mnt/c`, Vite's file watcher misses edits and serves stale code. Start a fresh server on a free port (`npx vite --port 5180 --strictPort`) and confirm the served module contains your change (`curl localhost:5180/src/...tsx | grep <new component>`).
+1. **Fresh dev server.** On WSL with the repo under `/mnt/c`, Vite's file watcher misses edits and serves stale code — **restart the server after every code change** before capturing (don't enable `usePolling` on the whole repo; it makes Vite unusably slow). Start a fresh server on a free port (`npx vite --port 5180 --strictPort`) and confirm the served module contains your change (`curl localhost:5180/src/...tsx | grep <new component>`).
 2. **Page height is Hug.** No `h-screen overflow-y-auto` on the main column; the document itself must scroll, or the capture is cut at 900px.
 3. **Capture at exactly 1440px wide.** Use Playwright (Windows Chrome via `channel: 'chrome'` if WSL Chromium lacks libs) with `viewport: { width: 1440, height: 900 }`, then:
    - remove `position: fixed` dev overlays (module switcher, feedback annotator) before capture;
