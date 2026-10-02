@@ -26,7 +26,10 @@ const isAL = n => n && n.type === 'FRAME' && n.layoutMode && n.layoutMode !== 'N
 const hasPaint = n =>
   ('fills' in n && Array.isArray(n.fills) && n.fills.some(f => f.visible !== false && (f.opacity ?? 1) > 0)) ||
   ('strokes' in n && Array.isArray(n.strokes) && n.strokes.length > 0);
-const isPill = n => n && n.type === 'FRAME' && typeof n.cornerRadius === 'number' && n.cornerRadius >= 100 && hasPaint(n);
+const isPill = n => n && n.type === 'FRAME' && (
+  (typeof n.cornerRadius === 'number' && n.cornerRadius >= 100 && hasPaint(n)) ||
+  (n.name.startsWith('Button') && n.layoutSizingHorizontal === 'HUG')); // pills, badges, Hug buttons incl. text links
+const isPillGroup = n => n.type === 'FRAME' && n.children.length > 0 && n.children.every(c => isPill(c) || isIcon(c)); // button/filter groups stay Hug
 const inPill = n => { for (let c = n.parent, i = 0; c && i < 3; c = c.parent, i++) if (isPill(c)) return true; return false; };
 const isIcon = n =>
   n.name === 'Image' || ['VECTOR', 'GROUP', 'ELLIPSE', 'LINE', 'BOOLEAN_OPERATION'].includes(n.type) ||
@@ -69,7 +72,13 @@ for (const w of wrappers) {
 
 // 3. sizing, top-down so parents become Fill before their children
 function visit(p) {
-  if (!isAL(p)) return;
+  if (!('children' in p)) return;
+  // keep descending through non-auto-layout frames (e.g. hero cards with an absolute background layer)
+  if (!isAL(p)) { for (const k of p.children) if (k.type === 'FRAME') visit(k); return; }
+  // absolute overlay pinned across its parent (left+right) exported as Hug -> fixed width so its text can Fill
+  if (p.layoutPositioning === 'ABSOLUTE' && p.layoutSizingHorizontal === 'HUG' && p.parent && p.width >= p.parent.width * 0.75) {
+    p.layoutSizingHorizontal = 'FIXED'; log.frameFill++;
+  }
   const canFill = p.layoutSizingHorizontal !== 'HUG' || p === root;
   const kids = p.children.filter(k => k.visible && k.layoutPositioning !== 'ABSOLUTE');
   if (canFill && !isPill(p) && !inPill(p)) {
@@ -80,7 +89,7 @@ function visit(p) {
         if (k.width >= innerW(p) - 2) { k.layoutSizingHorizontal = 'FILL'; isPill(k) ? log.buttonFill++ : log.frameFill++; }
       }
     } else if (p.layoutMode === 'HORIZONTAL') {
-      const textish = kids.filter(k => !isIcon(k) && !isPill(k) &&
+      const textish = kids.filter(k => !isIcon(k) && !isPill(k) && !isPillGroup(k) &&
         (k.type === 'TEXT' || (k.type === 'FRAME' && !hasPaint(k) && k.findOne(t => t.type === 'TEXT'))));
       let seenFill = textish.some(k => k.layoutSizingHorizontal === 'FILL') ? null : false;
       textish.forEach((k, i) => {
