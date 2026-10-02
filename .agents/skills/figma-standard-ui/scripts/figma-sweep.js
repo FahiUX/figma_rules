@@ -13,7 +13,9 @@
 //     - HORIZONTAL row: exactly one text element is Fill (the first); later texts -> Hug.
 //     - Buttons, badges, pills and anything inside them keep Hug text.
 //  4. Text inside short fixed-height cells (table rows/headers <= 80px) truncates to 1 line.
-//  5. Returns an audit: GRID frames, padded plain frames, non-Plus Jakarta fonts, leftovers.
+//  5. Squashed chart dots (circles from a stretched SVG) -> round again, same centre.
+//  6. Any non-Plus Jakarta Sans text (e.g. SVG <text> exported as Inter) -> Plus Jakarta Sans.
+//  7. Returns an audit: GRID frames, padded plain frames, non-Plus Jakarta fonts, leftovers.
 
 const ROOT_ID = 'ROOT_ID';
 
@@ -45,7 +47,7 @@ const fonts = new Map();
 for (const t of allTexts()) for (const s of t.getStyledTextSegments(['fontName'])) fonts.set(JSON.stringify(s.fontName), s.fontName);
 await Promise.all([...fonts.values()].map(f => figma.loadFontAsync(f)));
 
-const log = { radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0 };
+const log = { radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, dotsRounded: 0, fontsFixed: 0 };
 
 // 1. radii + min/max width
 for (const n of [root, ...root.findAll(() => true)]) {
@@ -115,6 +117,32 @@ for (const t of allTexts()) {
 }
 
 // 5. audit
+// 5. squashed chart dots: small vectors next to a wide chart path whose width != height
+const isSquashedDot = v => {
+  if (v.type !== 'VECTOR' && v.type !== 'ELLIPSE') return false;
+  const big = Math.max(v.width, v.height), small = Math.min(v.width, v.height);
+  if (big > 24 || small < 3) return false;
+  const ratio = small / big;
+  if (ratio > 0.95 || ratio < 0.5) return false;
+  return v.parent && 'children' in v.parent && v.parent.children.some(s => s !== v && s.type === 'VECTOR' && s.width >= 150);
+};
+for (const v of root.findAll(isSquashedDot)) {
+  const d = Math.round((v.width + v.height) / 2), cx = v.x + v.width / 2, cy = v.y + v.height / 2;
+  v.resize(d, d); v.x = cx - d / 2; v.y = cy - d / 2; log.dotsRounded++;
+}
+
+// 6. fonts: everything Plus Jakarta Sans, keep the weight
+const pjs = new Set((await figma.listAvailableFontsAsync()).filter(f => f.fontName.family === 'Plus Jakarta Sans').map(f => f.fontName.style));
+const toPjsStyle = st => { const k = st.replace(/\s+/g, '').replace('Italic', ''); return pjs.has(k) ? k : (/(Bold|Black|Heavy)/i.test(k) ? 'Bold' : 'Regular'); };
+for (const t of allTexts()) {
+  for (const seg of t.getStyledTextSegments(['fontName'])) {
+    if (seg.fontName.family === 'Plus Jakarta Sans') continue;
+    const fn = { family: 'Plus Jakarta Sans', style: toPjsStyle(seg.fontName.style) };
+    await figma.loadFontAsync(fn);
+    t.setRangeFontName(seg.start, seg.end, fn); log.fontsFixed++;
+  }
+}
+
 const texts = allTexts();
 const audit = {
   gridFrames: root.findAll(n => n.type === 'FRAME' && n.layoutMode === 'GRID').map(n => n.id),
@@ -122,6 +150,7 @@ const audit = {
   nonJakartaFonts: [...new Set(texts.flatMap(t => t.getStyledTextSegments(['fontName']).map(s => s.fontName.family)))].filter(f => f !== 'Plus Jakarta Sans'),
   textWrappersLeft: root.findAll(n => n.type === 'FRAME' && n.children.length === 1 && n.children[0].type === 'TEXT' && !hasPaint(n)).length,
   textsNotFillOutsidePills: texts.filter(t => t.layoutSizingHorizontal !== 'FILL' && !inPill(t)).map(t => `${t.id} "${t.characters.slice(0, 24)}" (${t.layoutSizingHorizontal}, parent ${t.parent.layoutMode})`),
+  squashedDotsLeft: root.findAll(isSquashedDot).length,
   narrowTexts: texts.filter(t => t.width < 8 && t.characters.trim().length > 1).map(t => `${t.id} "${t.characters.slice(0, 24)}"`),
 };
 return { root: `${root.name} ${Math.round(root.width)}x${Math.round(root.height)}`, log, audit };

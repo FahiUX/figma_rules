@@ -300,8 +300,9 @@ Web charts frequently export into Figma as flat blurry PNG bitmaps or fragmented
    - Area fill: `<path d="..." fill="url(#grad)" />` with `<defs><linearGradient>` (exports to a native Figma vector with gradient fill).
    - Data points: `<circle cx="..." cy="..." r="..." />` (exports to Figma Ellipses).
    - Gridlines: `<line strokeDasharray="4 4" />` (exports to Figma dashed vectors).
-3. **No SVG `<text>`**: the converter exports SVG text in **Inter** (banned font). Threshold labels, axis labels and legends go in HTML.
-4. **Axis Labels in Auto Layout (NOT in SVG)**:
+3. **Never stretch an SVG** (`preserveAspectRatio="none"`): it scales x and y differently, so every `<circle>` becomes an oval and strokes change thickness (M5 chart dots exported as 9.8×13 ovals). Give the SVG the same shape as its viewBox (`w-full h-auto aspect-[700/240]`). If a chart must stretch, it may contain only lines/areas with `vectorEffect="non-scaling-stroke"`; dots go in HTML (`absolute` + `rounded-full`).
+4. **No SVG `<text>`**: the converter exports SVG text in **Inter** (banned font). Threshold labels, axis labels and legends go in HTML.
+5. **Axis Labels in Auto Layout (NOT in SVG)**:
    - Place X-axis labels in a clean HTML Auto Layout flex row directly below the SVG (`flex flex-row justify-between w-full`) so they export as a responsive Auto Layout text row.
 
 ```tsx
@@ -327,6 +328,16 @@ Web charts frequently export into Figma as flat blurry PNG bitmaps or fragmented
 
 ---
 
+## 🧱 App Shell (Sidebar + Header) Follows the Same Rules
+
+The shell is captured with every screen, so its violations show up on every screen (M5/M6 tests: all 36 leftover padded frames were in the sidebar and header).
+- **Build the shell once** as shared components (e.g. `AppSidebar`, `AppHeader`) that each module configures with its own nav items and persona. Never copy-paste a shell per module: a fix then has to be repeated N times.
+- **Same rules as page content**: padding only on the whitelist (the sidebar/header container itself, nav buttons, badges), gap between nav groups and items, Fill × Hug labels, no `pt-*`/`mt-*` between sections.
+- **The sidebar stretches with the page**: no `h-screen sticky` on the sidebar frame itself (it is captured as a fixed 900px frame while the page is taller). Let the sidebar `self-stretch` to page height and put `sticky top-0` on an inner wrapper if it must stay visible while scrolling.
+- **Audit**: after the sweep, `paddedPlainFrames` outside the page content means the shell breaks the rules. Fix it in the shell component, once.
+
+---
+
 ## 📤 html → Figma Capture Workflow (Required)
 
 Every screen goes into Figma through the **html->figma capture** (Figma MCP `generate_figma_design`), followed by the sweep. Never hand-build a screen that exists in code.
@@ -337,8 +348,8 @@ Every screen goes into Figma through the **html->figma capture** (Figma MCP `gen
    - remove `position: fixed` dev overlays (module switcher, feedback annotator) before capture;
    - call `generate_figma_design` with the fileKey to get a captureId, inject `https://mcp.figma.com/mcp/html-to-design/capture.js`, run `window.figma.captureForDesign({ captureId, endpoint, selector: 'body' })`;
    - poll `generate_figma_design` with the captureId until `completed`; note the new node id.
-4. **Run the sweep.** Read `scripts/figma-sweep.js`, replace `ROOT_ID` with the captured node id, and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, and table truncation.
-5. **Check the audit it returns.** `gridFrames`, `nonJakartaFonts`, `textWrappersLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). Then screenshot the frame and look for overflow or squeezed text.
+4. **Run the sweep.** Read `scripts/figma-sweep.js`, replace `ROOT_ID` with the captured node id, and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, table truncation, rounds squashed chart dots, and converts any non-Plus Jakarta Sans text.
+5. **Check the audit it returns.** `gridFrames`, `nonJakartaFonts`, `textWrappersLeft`, `squashedDotsLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). Then screenshot the frame and look for overflow or squeezed text.
 6. **New edge case?** Fix it in `scripts/figma-sweep.js` (not by hand on one screen) so the next capture gets it for free.
 
 ---
