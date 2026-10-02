@@ -345,12 +345,12 @@ Every screen goes into Figma through the **html->figma capture** (Figma MCP `gen
 
 1. **Dev server serves your latest code.** Confirm the served module contains your change (e.g. `curl localhost:<port>/src/...tsx | grep <new component>`) before capturing. If it is stale, see Troubleshooting.
 2. **Page height is Hug.** No `h-screen overflow-y-auto` on the main column; the document itself must scroll, or the capture is cut at 900px.
-3. **Capture at exactly 1440px wide, in a visible browser.** Use Playwright with `headless: false` and `viewport: { width: 1440, height: 900 }` so the user can watch the capture, then:
+3. **Capture at exactly 1440px wide, in a visible browser.** Use Playwright with `headless: false` and `viewport: { width: 1440, height: 900 }` so the user can watch the capture. A visible browser shows a scrollbar that steals ~15px (page renders 1425px wide): hide it before capturing (`html{scrollbar-width:none} ::-webkit-scrollbar{display:none}`) and check `document.documentElement.clientWidth === 1440`. Then:
    - remove `position: fixed` dev overlays (module switcher, feedback annotator) before capture;
    - call `generate_figma_design` with the fileKey to get a captureId, inject `https://mcp.figma.com/mcp/html-to-design/capture.js`, run `window.figma.captureForDesign({ captureId, endpoint, selector: 'body' })`;
    - poll `generate_figma_design` with the captureId until `completed`; note the new node id.
 4. **Run the sweep.** Read `scripts/figma-sweep.js`, set `ROOT_ID` to the captured node id and `FONT_FAMILY` to the project font (see Project Settings), and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, table truncation, Fill-height shell columns, rounds squashed chart dots, and converts off-brand fonts.
-5. **Check the audit it returns.** `gridFrames`, `offBrandFonts`, `textWrappersLeft`, `shortShellColumns`, `squashedDotsLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). Then screenshot the frame and look for overflow or squeezed text.
+5. **Check the audit it returns.** `gridFrames`, `offBrandFonts`, `textWrappersLeft`, `shortShellColumns`, `squashedDotsLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). `paddedPlainFrames` may only list the main canvas and card/hero content containers (buttons are whitelisted and not listed). Then screenshot the frame and look for overflow or squeezed text.
 6. **New edge case?** Fix it in `scripts/figma-sweep.js` (not by hand on one screen) so the next capture gets it for free.
 
 ### Project Settings
