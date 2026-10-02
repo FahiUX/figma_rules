@@ -13,6 +13,7 @@
 //     - HORIZONTAL row: exactly one text element is Fill (the first); later texts -> Hug.
 //     - Buttons, badges, pills and anything inside them keep Hug text.
 //  4. Text inside short fixed-height cells (table rows/headers <= 80px) truncates to 1 line.
+//  4b. Shell columns (sidebar) captured at screen height (h-screen sticky) -> Fill height of the page row.
 //  5. Squashed chart dots (circles from a stretched SVG) -> round again, same centre.
 //  6. Any non-Plus Jakarta Sans text (e.g. SVG <text> exported as Inter) -> Plus Jakarta Sans.
 //  7. Returns an audit: GRID frames, padded plain frames, non-Plus Jakarta fonts, leftovers.
@@ -47,7 +48,7 @@ const fonts = new Map();
 for (const t of allTexts()) for (const s of t.getStyledTextSegments(['fontName'])) fonts.set(JSON.stringify(s.fontName), s.fontName);
 await Promise.all([...fonts.values()].map(f => figma.loadFontAsync(f)));
 
-const log = { radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, dotsRounded: 0, fontsFixed: 0 };
+const log = { radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, dotsRounded: 0, fontsFixed: 0, shellFill: 0 };
 
 // 1. radii + min/max width
 for (const n of [root, ...root.findAll(() => true)]) {
@@ -117,6 +118,16 @@ for (const t of allTexts()) {
 }
 
 // 5. audit
+// 4b. shell columns: a tall column (e.g. sidebar) in a horizontal page row, fixed at the viewport height
+//     while the row is taller -> Fill height so it runs the full page
+for (const row of [root, ...root.findAll(n => isAL(n) && n.layoutMode === 'HORIZONTAL')]) {
+  if (!isAL(row) || row.layoutMode !== 'HORIZONTAL') continue;
+  for (const col of row.children) {
+    if (col.type !== 'FRAME' || col.layoutPositioning === 'ABSOLUTE' || col.layoutSizingVertical !== 'FIXED') continue;
+    if (col.height >= 600 && col.height < row.height - 40) { col.layoutSizingVertical = 'FILL'; log.shellFill++; }
+  }
+}
+
 // 5. squashed chart dots: small vectors next to a wide chart path whose width != height
 const isSquashedDot = v => {
   if (v.type !== 'VECTOR' && v.type !== 'ELLIPSE') return false;
@@ -150,6 +161,7 @@ const audit = {
   nonJakartaFonts: [...new Set(texts.flatMap(t => t.getStyledTextSegments(['fontName']).map(s => s.fontName.family)))].filter(f => f !== 'Plus Jakarta Sans'),
   textWrappersLeft: root.findAll(n => n.type === 'FRAME' && n.children.length === 1 && n.children[0].type === 'TEXT' && !hasPaint(n)).length,
   textsNotFillOutsidePills: texts.filter(t => t.layoutSizingHorizontal !== 'FILL' && !inPill(t)).map(t => `${t.id} "${t.characters.slice(0, 24)}" (${t.layoutSizingHorizontal}, parent ${t.parent.layoutMode})`),
+  shortShellColumns: root.findAll(n => n.type === 'FRAME' && isAL(n.parent) && n.parent.layoutMode === 'HORIZONTAL' && n.layoutSizingVertical === 'FIXED' && n.height >= 600 && n.height < n.parent.height - 40).map(n => n.id),
   squashedDotsLeft: root.findAll(isSquashedDot).length,
   narrowTexts: texts.filter(t => t.width < 8 && t.characters.trim().length > 1).map(t => `${t.id} "${t.characters.slice(0, 24)}"`),
 };

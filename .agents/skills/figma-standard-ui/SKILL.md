@@ -334,6 +334,7 @@ The shell is captured with every screen, so its violations show up on every scre
 - **Build the shell once** as shared components (e.g. `AppSidebar`, `AppHeader`) that each module configures with its own nav items and persona. Never copy-paste a shell per module: a fix then has to be repeated N times.
 - **Same rules as page content**: padding only on the whitelist (the sidebar/header container itself, nav buttons, badges), gap between nav groups and items, Fill × Hug labels, no `pt-*`/`mt-*` between sections.
 - **The sidebar stretches with the page**: no `h-screen sticky` on the sidebar frame itself (it is captured as a fixed 900px frame while the page is taller). Let the sidebar `self-stretch` to page height and put `sticky top-0` on an inner wrapper if it must stay visible while scrolling.
+- **Captured sidebar height**: html->figma captures a sticky sidebar at the viewport height (288×900 FIXED) even when the page is 2,000px+. The sweep sets such shell columns to **Fill height**; fix the code too.
 - **Audit**: after the sweep, `paddedPlainFrames` outside the page content means the shell breaks the rules. Fix it in the shell component, once.
 
 ---
