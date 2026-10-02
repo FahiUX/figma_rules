@@ -1,6 +1,6 @@
 ---
 name: figma-standard-ui
-description: Enforces strict Figma Auto Layout architecture for frontend code (React, TSX, Tailwind, HTML). Ensures all generated UI translates 1:1 into native Figma Auto Layout frames with 1440px desktop baseline, Hug height containers, 40px canvas padding, pixel units, Gap-only spacing, multi-level nesting, absolute badge positioning, wrap grids, column tables, vector charts, and zero export cleanup needed. Use when building UI meant for Figma handoff, design systems, or html-to-figma exports.
+description: Enforces strict Figma Auto Layout architecture for frontend code (React, TSX, Tailwind, HTML). Ensures all generated UI translates 1:1 into native Figma Auto Layout frames with 1440px desktop baseline, Hug height containers, 40px canvas padding, pixel units, Gap-only spacing, multi-level nesting, absolute badge positioning, wrap rows, column tables, vector charts, no min/max width, and Fill x Hug text. Includes the html->figma capture workflow and a required post-capture sweep script (scripts/figma-sweep.js). Use when building UI meant for Figma handoff, design systems, or html-to-figma exports.
 ---
 
 # Figma-Standard UI Architecture Skill
@@ -32,19 +32,61 @@ The main work area / canvas content container must consistently use **`40px` pad
 For layout dimensions, heights, widths, and structural spacing, use **explicit pixel values** (e.g., `h-[72px]`, `w-[280px]`, `p-[40px]`, `gap-[24px]`, `gap-6` (24px), `gap-8` (32px)):
 - **Why**: `rem` values depend on root browser font scaling and computed stylesheet rules, which frequently cause fractional pixel drift (e.g., `15.98px`, `39.87px`) during HTML-to-Figma conversion. Exact pixel definitions ensure clean, integer dimensions on the Figma canvas.
 
-### 5. Flexbox Auto Layout Only (Strict Ban on CSS Grid)
-Figma Auto Layout is fundamentally CSS Flexbox. CSS Grid does not translate cleanly to Figma.
+### 5. Auto Layout Directions Only: Horizontal, Vertical, Wrap (Strict Ban on CSS Grid)
+Figma Auto Layout has three directions we use: **Horizontal**, **Vertical**, and **Wrap**. We never use Figma's Grid auto layout.
 - **Vertical Frame**: Use `flex flex-col`
 - **Horizontal Frame**: Use `flex flex-row`
 - **Wrap Frame**: Use `flex flex-row flex-wrap`
-- **BANNED**: `display: grid`, `grid-cols-*`.
+- **BANNED**: `display: grid`, `grid`, `grid-cols-*`, `grid-rows-*`, `col-span-*`, including responsive variants (`sm:grid-cols-2 xl:grid-cols-4`). Exporters turn any of these into a Figma **`GRID`** auto layout frame, which the designer must rebuild by hand.
+- **Real export bug (M8 KPI ribbon)**: `grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6` was exported as `layoutMode = GRID`. The designer rebuilt it as `HORIZONTAL, gap 20` with each card `Fill`. Write that from the start:
+```tsx
+{/* BAD: exports as a Figma GRID frame */}
+<div className="w-full grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">...</div>
 
-### 6. Spacing: Gap & Padding Only (Strict Ban on Margins)
+{/* GOOD: exports as Horizontal Auto Layout, cards Fill */}
+<div className="w-full flex flex-row items-stretch gap-5">
+  <div className="flex-1 min-w-0 ...">...</div>
+</div>
+
+{/* GOOD: if cards must reflow to new lines, use Wrap, not grid */}
+<div className="w-full flex flex-row flex-wrap items-stretch gap-5">
+  <div className="flex-1 min-w-[240px] ...">...</div>
+</div>
+```
+
+### 6. Spacing: Gap Only Between Children (Strict Ban on Margins)
 Figma has only two spacing concepts: **Item Spacing (Gap)** and **Frame Padding**. There is no "margin" in Figma Auto Layout.
-- **Between siblings / row containers**: Use ONLY parent `gap-*` (e.g., `gap-4` (16px), `gap-6` (24px), `gap-8` (32px), `gap-10` (40px)).
-- **Inside container**: Use ONLY `p-*`, `px-*`, `py-*` on the parent frame.
-- **BANNED**: `mt-*`, `mb-*`, `ml-*`, `mr-*` for layout spacing between stacked sections or sibling elements.
+- **Between siblings / row containers**: Use ONLY parent `gap-*` (e.g., `gap-2` (8px), `gap-4` (16px), `gap-6` (24px), `gap-8` (32px), `gap-10` (40px)).
+- **Inside a frame**: Padding only on the whitelisted elements in Rule 6A. Everything else is `padding = 0`.
+- **BANNED**: `mt-*`, `mb-*`, `ml-*`, `mr-*`, `pt-*`/`pb-*` used as spacing, and `space-y-*` / `space-x-*`. Exporters turn these into padding on the child frame, often with a fixed height too.
 - **BANNED**: Empty spacer divs like `<div className="h-4" />`.
+- **Real export bug (M8 KPI card)**: a subtitle row with `mt-2` was exported as a frame with `paddingTop = 8` and a **fixed 24px height**. The designer fixed it to `padding 0, Hug height`, with `gap = 8` on the parent stack:
+```tsx
+{/* BAD: mt-2 becomes paddingTop 8 + fixed height on the child frame */}
+<div>
+  <div className="text-4xl ...">14,290</div>
+  <div className="text-xs ... flex items-center gap-1.5 mt-2">...</div>
+</div>
+
+{/* GOOD: parent gap carries the spacing, child has zero padding */}
+<div className="w-full self-stretch flex flex-col items-stretch gap-2">
+  <div className="w-full self-stretch text-4xl ...">14,290</div>
+  <div className="w-full self-stretch flex flex-row items-center gap-1.5 text-xs ...">...</div>
+</div>
+```
+
+### 6A. Padding Whitelist (Everything Else Is Zero Padding)
+Only these elements may have padding:
+| Allowed | Example |
+| :--- | :--- |
+| **Main Container** (cards, panels, modals, table shells, i.e. the outer boundary frame) | `p-6`, `p-8` |
+| **Main Content / Canvas** (the page work area) | `p-10` (40px) |
+| **Button** | `px-4 py-2` |
+| **Badge / Pill** | `px-2 py-0.5` |
+
+**Zero padding on everything else**: small components and inner frames such as list rows, header rows, metric rows, text stacks, icon+label rows, menu items, wrappers and dividers. They get their spacing from the parent `gap`, and their size from Hug, Fill, or an explicit fixed height (`h-[40px]`) with `items-center`.
+- If a small component seems to "need" padding to look right, give it a fixed height plus alignment, or a gap. Do not add padding.
+- Never defend inner padding as "it came from the React code". Rewrite the code instead.
 
 ### 7. Sizing Constraints: 1:1 Figma Mapping (Hug vs Fill vs Fixed)
 Every JSX element must explicitly declare its resizing behavior:
@@ -78,8 +120,10 @@ NEVER use `border-b pb-*` or `border-t pt-*` on Auto Layout headers or section c
 </div>
 ```
 
-### 9. Strict Ban on `max-w-*` (The Max-Width Trap)
-NEVER use `max-w-*` (`max-w-2xl`, `max-w-xl`, `max-w-md`, `max-w-[300px]`, `max-w-7xl mx-auto`) on layout elements, cards, or text stacks.
+### 9. Strict Ban on `max-w-*` and `min-w-[...]` (No Min/Max Width)
+We never use min width or max width, in code or in Figma.
+NEVER use `max-w-*` (`max-w-2xl`, `max-w-xl`, `max-w-md`, `max-w-[300px]`, `max-w-7xl mx-auto`) or a pixel `min-w-*` (`min-w-[220px]`, `min-w-[480px]`) on layout elements, cards, or text stacks.
+- **`min-w-[Npx]` exports as Figma `minWidth`**: a real M5 capture produced 9 frames with Min W (220, 280, 400…) from `flex-1 min-w-[220px]` cards. Use `flex-1 min-w-0` (min-w-0 is fine, it does not export) and a plain `flex-row` without wrap at the 1440 baseline.
 - **Why**: Figma Auto Layout does not have standard fluid CSS max-width. Exporters convert `max-w-*` into **rigid fixed-width frames** (e.g. `max-w-2xl` becomes a hardcoded `width = 672px` frame). When placed in a wider Figma artboard or resized, the frame refuses to stretch, creating awkward dead space on the canvas.
 - **Rules**:
   * **On Page Containers**: Use `w-full` with padding (`p-10`), or let the root 1440px desktop frame define boundaries. Ban `max-w-7xl mx-auto`.
@@ -87,14 +131,46 @@ NEVER use `max-w-*` (`max-w-2xl`, `max-w-xl`, `max-w-md`, `max-w-[300px]`, `max-
   * **On Text / Paragraphs**: Let text wrap naturally within its `w-full self-stretch` container.
   * **On Truncated Table Cells**: Use `flex-1 min-w-0 truncate`, NEVER `max-w-[200px]`.
 
-### 10. Text Layer Standard: "Fit to Fill" (Auto Height & Fill Container)
-In Figma, text layers inside Auto Layout cards and containers must be set to:
-- **Horizontal Resizing: Fill Container (`layoutAlign = "STRETCH"`)**
-- **Vertical Resizing: Hug Contents (Auto Height)**
+### 10. Text Layer Standard: Fill Horizontal × Hug Vertical
+Every text layer is set to:
+- **Horizontal Resizing: Fill Container** (`layoutSizingHorizontal = "FILL"`)
+- **Vertical Resizing: Hug Contents** (`layoutSizingVertical = "HUG"`, `textAutoResize = "HEIGHT"`)
+- **Never** `Hug × Hug` (`WIDTH_AND_HEIGHT`): this is what exporters produce by default for bare `<span>`/`<div>` text, and the layer stops reflowing when the card resizes.
+- **Never** a fixed width or a fixed height on text.
+- **No `w-fit` on non-button text** (labels, legend items, route text): it exports Hug and the sweep can only guess which text in the row should Fill. Use `flex-1 min-w-0` for the label; `w-fit whitespace-nowrap` is only for buttons, badges, pills and the value after a label.
+- **The only exception** is text inside a Button or Badge/Pill, which stays Hug × Hug (`whitespace-nowrap w-fit`).
+- **Container → Text, both Fill horizontal**: when text sits inside an auto layout container, the text is **Fill** and its container is **Fill** horizontally as well. Fill needs a Fill parent: a Fill text inside a Hug container still shrinks to the text's width. Every wrapper from the text up to the card must be Fill horizontal.
+  * In a vertical stack, the wrapper uses `w-full self-stretch`.
+  * In a horizontal row next to an icon or button, the wrapper uses `flex-1 min-w-0` (Fill), and the icon or button stays Fixed or Hug.
+  * **Real export bug (M8 KPI card)**: the `"Text"` wrapper around "Passports Minted" and the wrapper around "$1,929,000" were exported as **Hug × Hug**. Both must be Fill × Hug, and so must the text inside them.
+```tsx
+{/* BAD: wrapper and text both Hug → exports Hug × Hug */}
+<div className="flex items-center justify-between">
+  <div><span className="text-xs ...">Passports Minted</span></div>
+  <div className="w-10 h-10 shrink-0 ...">{icon}</div>
+</div>
+
+{/* GOOD: wrapper Fill (flex-1) → text Fill (w-full), icon Fixed */}
+<div className="w-full self-stretch flex flex-row items-center gap-3">
+  <div className="flex-1 min-w-0 flex flex-col items-stretch">
+    <span className="w-full self-stretch text-xs ...">Passports Minted</span>
+  </div>
+  <div className="w-10 h-10 shrink-0 ...">{icon}</div>
+</div>
+```
 - **Rules**:
-  * **Headings & Paragraphs**: Must always declare `w-full self-stretch` (e.g. `<h3 className="w-full self-stretch text-lg ...">`, `<p className="w-full self-stretch text-sm ...">`).
+  * **All text (headings, paragraphs, labels, values, eyebrows)**: always declare `w-full self-stretch` (e.g. `<h3 className="w-full self-stretch text-lg ...">`, `<span className="w-full self-stretch text-xs ...">`).
   * **Text inside Flex Rows**: When text sits next to an icon, pill, or button, wrap the text stack in `flex-1 min-w-0` so it expands to fill remaining space.
   * **BANNED**: `whitespace-nowrap` on descriptive text or body paragraphs. Only pills, badges, and tags are allowed to have `whitespace-nowrap w-fit`.
+- **Text sits directly in its auto layout parent**: no extra frame between a text and its parent. ✅ `Row (Fill) > TEXT (Fill)`. ❌ `Row (Fill) > Frame "Text" > TEXT`.
+- **One Fill per row**: in a horizontal row only one text element is Fill (the label). A value after it (`$22.4M (52%)`, "Zero Default") is Hug. Two Fill texts in one row squeeze each other; a real M5 capture squeezed "Zero Default" to 2px wide.
+- **Full-width buttons are Fill** (e.g. "View All 14 Active Vaults" spanning its card). All other buttons, badges and pills are Hug.
+- **Table cell text truncates to one line** (`truncate` in code, Truncate + max 1 line in Figma).
+- **No hidden overflow at 1440**: a Hug value wider than its card (M5: `$42,850,000` at 32px in a 205px card) overflows silently in the browser and wraps once Fill is applied. Size values to fit (28px).
+- **⚠️ What the html->figma converter actually does (verified on the M5 capture):**
+  1. It wraps **every** text in an extra `"Text"` frame and leaves the TEXT itself Hug × Hug (or Fixed width when it wraps). No Tailwind class changes this.
+  2. It exports `w-full` / `width: 100%` as a **FIXED** width, not Fill. Only `flex-1` (main axis) comes out Fill.
+  3. So the code rules above get the structure right, but **Fill × Hug text is only reached by running the post-capture sweep** (see "html → Figma Capture Workflow").
 
 ---
 
@@ -156,7 +232,7 @@ Never use CSS Grid or `max-w-*`. Use horizontal flex with `w-full flex-1 min-w-0
   <div className="w-full flex-1 min-w-0 flex flex-col items-stretch justify-between gap-4 p-6 rounded-2xl bg-white border border-neutral-200">
     {/* Header row: self-stretch */}
     <div className="w-full self-stretch flex flex-row items-center justify-between">
-      <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Metric Title</span>
+      <span className="flex-1 min-w-0 text-xs text-neutral-500 font-semibold uppercase tracking-wider">Metric Title</span>
       <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
         <TrendingUpIcon className="w-4 h-4 shrink-0" />
       </span>
@@ -165,7 +241,7 @@ Never use CSS Grid or `max-w-*`. Use horizontal flex with `w-full flex-1 min-w-0
     <div className="w-full self-stretch flex flex-col items-stretch gap-1">
       {/* Value Row: items-center (NEVER items-baseline) */}
       <div className="w-full self-stretch flex flex-row items-center gap-2">
-        <span className="text-3xl font-extrabold text-neutral-900 tracking-tight">RM 4.85M</span>
+        <span className="flex-1 min-w-0 text-3xl font-extrabold text-neutral-900 tracking-tight">RM 4.85M</span>
         <span className="px-2 py-0.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-full shrink-0">+14.2%</span>
       </div>
       <p className="w-full self-stretch text-xs text-neutral-500">vs last month trailing average</p>
@@ -224,7 +300,8 @@ Web charts frequently export into Figma as flat blurry PNG bitmaps or fragmented
    - Area fill: `<path d="..." fill="url(#grad)" />` with `<defs><linearGradient>` (exports to a native Figma vector with gradient fill).
    - Data points: `<circle cx="..." cy="..." r="..." />` (exports to Figma Ellipses).
    - Gridlines: `<line strokeDasharray="4 4" />` (exports to Figma dashed vectors).
-3. **Axis Labels in Auto Layout (NOT in SVG)**:
+3. **No SVG `<text>`**: the converter exports SVG text in **Inter** (banned font). Threshold labels, axis labels and legends go in HTML.
+4. **Axis Labels in Auto Layout (NOT in SVG)**:
    - Place X-axis labels in a clean HTML Auto Layout flex row directly below the SVG (`flex flex-row justify-between w-full`) so they export as a responsive Auto Layout text row.
 
 ```tsx
@@ -250,6 +327,22 @@ Web charts frequently export into Figma as flat blurry PNG bitmaps or fragmented
 
 ---
 
+## 📤 html → Figma Capture Workflow (Required)
+
+Every screen goes into Figma through the **html->figma capture** (Figma MCP `generate_figma_design`), followed by the sweep. Never hand-build a screen that exists in code.
+
+1. **Fresh dev server.** On WSL with the repo under `/mnt/c`, Vite's file watcher misses edits and serves stale code — **restart the server after every code change** before capturing (don't enable `usePolling` on the whole repo; it makes Vite unusably slow). Start a fresh server on a free port (`npx vite --port 5180 --strictPort`) and confirm the served module contains your change (`curl localhost:5180/src/...tsx | grep <new component>`).
+2. **Page height is Hug.** No `h-screen overflow-y-auto` on the main column; the document itself must scroll, or the capture is cut at 900px.
+3. **Capture at exactly 1440px wide.** Use Playwright (Windows Chrome via `channel: 'chrome'` if WSL Chromium lacks libs) with `viewport: { width: 1440, height: 900 }`, then:
+   - remove `position: fixed` dev overlays (module switcher, feedback annotator) before capture;
+   - call `generate_figma_design` with the fileKey to get a captureId, inject `https://mcp.figma.com/mcp/html-to-design/capture.js`, run `window.figma.captureForDesign({ captureId, endpoint, selector: 'body' })`;
+   - poll `generate_figma_design` with the captureId until `completed`; note the new node id.
+4. **Run the sweep.** Read `scripts/figma-sweep.js`, replace `ROOT_ID` with the captured node id, and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, and table truncation.
+5. **Check the audit it returns.** `gridFrames`, `nonJakartaFonts`, `textWrappersLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). Then screenshot the frame and look for overflow or squeezed text.
+6. **New edge case?** Fix it in `scripts/figma-sweep.js` (not by hand on one screen) so the next capture gets it for free.
+
+---
+
 ## 🛡️ Clean Export Guardians Checklist
 
 | Guardian Rule | Requirement | Why |
@@ -258,12 +351,19 @@ Web charts frequently export into Figma as flat blurry PNG bitmaps or fragmented
 | **Height: HUG on Main Container** | Set container to `h-auto min-h-screen` | Prevents height truncation and fixed scrolling traps (e.g. `143:15668`). |
 | **40px Canvas Padding** | `p-10` on work area container | Ensures uniform breathable boundary across all screens (e.g. `143:15570`). |
 | **Pixel Units Preferred** | Use explicit `px` (`h-[72px]`, `w-[280px]`) | Avoids `rem` font-scaling fractional drift during vector conversion. |
+| **H / V / Wrap Only** | `flex-row`, `flex-col`, `flex-wrap` and never `grid` | `grid-cols-*` exports as a Figma GRID frame. |
 | **Inter-Row Spacing = Gap Only** | Parent `gap-6` / `gap-8` / `gap-10` | Eliminates margins and rogue intermediate wrapper padding. |
+| **Padding Whitelist** | Padding only on Main Container, Main Content, Button, Badge | Tabs, rows, stacks and wrappers stay `padding 0`. |
+| **Text = Fill × Hug** | `w-full self-stretch` on every text layer | Never Hug × Hug, except text inside a button or badge. |
+| **Text Container = Fill** | Wrapper `w-full self-stretch` (stack) / `flex-1 min-w-0` (row) | A Fill text inside a Hug container still shrinks to the text's width. |
+| **Text Directly in Parent** | No frame between text and its auto layout parent | Converter adds `"Text"` frames; the sweep unwraps them. |
+| **One Fill per Row** | Label Fill, values after it Hug | Two Fill texts squeeze each other (2px "Zero Default"). |
+| **Sweep After Capture** | Run `scripts/figma-sweep.js` on every html->figma capture | Converter never sets text to Fill; only the sweep does. |
 | **Multi-Level Nesting Hierarchy** | Tier 1 Atoms $\to$ Tier 5 Canvas | Ensures clean component isolation and dynamic reflow. |
 | **Absolute Positioning in AL** | `relative` parent + `absolute` child | Floating badges / live pips without breaking Auto Layout. |
 | **Wrap Direction (`flex-wrap`)** | `flex-wrap` with `shrink-0` chips | Responsive tag/filter clouds that wrap cleanly across lines. |
 | **Fit to Fill Text** | `w-full self-stretch` on headings & copy | Sets text to Horizontal Fill + Vertical Hug (auto height). |
-| **No `max-w-*`** | Ban `max-w-2xl`, `max-w-md`, etc. | Avoids rigid fixed-width frame lockups on canvas resize. |
+| **No min/max width** | Ban `max-w-*` and `min-w-[Npx]` | `max-w` locks width; `min-w-[Npx]` exports as Figma Min W. |
 | **No `items-baseline`** | Always use `items-center` | Prevents fallback to absolute manual coordinates in Figma. |
 | **No Pseudo-elements** | Avoid `::before` / `::after` for UI | Exporters drop pseudo elements; use explicit JSX elements. |
 | **No `ml-auto`** | Use `justify-between` or nested frames | Auto-margins fail to translate to Auto Layout alignment. |
