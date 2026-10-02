@@ -1,6 +1,7 @@
 // figma-standard-ui — post-capture sweep
 // Run with the Figma MCP `use_figma` tool AFTER an html->figma capture (generate_figma_design).
-// Replace ROOT_ID with the captured screen frame id (e.g. '1137:2'), pass this whole file as `code`.
+// Set ROOT_ID to the captured screen frame id and FONT_FAMILY to the project's font (see SKILL.md "Project Settings"),
+// then pass this whole file as `code`. Leave FONT_FAMILY as 'FONT_FAMILY' to skip the font step.
 // Safe to re-run: every step is idempotent.
 //
 // What it does (in order):
@@ -15,10 +16,12 @@
 //  4. Text inside short fixed-height cells (table rows/headers <= 80px) truncates to 1 line.
 //  4b. Shell columns (sidebar) captured at screen height (h-screen sticky) -> Fill height of the page row.
 //  5. Squashed chart dots (circles from a stretched SVG) -> round again, same centre.
-//  6. Any non-Plus Jakarta Sans text (e.g. SVG <text> exported as Inter) -> Plus Jakarta Sans.
-//  7. Returns an audit: GRID frames, padded plain frames, non-Plus Jakarta fonts, leftovers.
+//  6. Any text not in FONT_FAMILY (e.g. SVG <text> exported as Inter) -> FONT_FAMILY, same weight.
+//  7. Returns an audit: GRID frames, padded plain frames, off-brand fonts, leftovers.
 
 const ROOT_ID = 'ROOT_ID';
+const FONT_FAMILY = 'FONT_FAMILY'; // project brand font, e.g. 'Plus Jakarta Sans'
+const fontSet = FONT_FAMILY && FONT_FAMILY !== 'FONT_FAMILY';
 
 const root = await figma.getNodeByIdAsync(ROOT_ID);
 if (!root) throw new Error(`Node ${ROOT_ID} not found`);
@@ -142,13 +145,20 @@ for (const v of root.findAll(isSquashedDot)) {
   v.resize(d, d); v.x = cx - d / 2; v.y = cy - d / 2; log.dotsRounded++;
 }
 
-// 6. fonts: everything Plus Jakarta Sans, keep the weight
-const pjs = new Set((await figma.listAvailableFontsAsync()).filter(f => f.fontName.family === 'Plus Jakarta Sans').map(f => f.fontName.style));
-const toPjsStyle = st => { const k = st.replace(/\s+/g, '').replace('Italic', ''); return pjs.has(k) ? k : (/(Bold|Black|Heavy)/i.test(k) ? 'Bold' : 'Regular'); };
-for (const t of allTexts()) {
+// 6. fonts: everything in the project font, keep the weight (skipped when FONT_FAMILY is not set)
+const brandStyles = fontSet ? (await figma.listAvailableFontsAsync()).filter(f => f.fontName.family === FONT_FAMILY).map(f => f.fontName.style) : [];
+if (fontSet && brandStyles.length === 0) throw new Error(`FONT_FAMILY "${FONT_FAMILY}" is not available in this file`);
+const brandStyleSet = new Set(brandStyles);
+const toBrandStyle = st => {
+  if (brandStyleSet.has(st)) return st;
+  const squashed = st.replace(/\s+/g, ''), spaced = st.replace(/([a-z])([A-Z])/g, '$1 $2');
+  for (const c of [squashed, spaced, st.replace('Italic', '').trim()]) if (brandStyleSet.has(c)) return c;
+  return /(Bold|Black|Heavy)/i.test(st) ? (brandStyleSet.has('Bold') ? 'Bold' : brandStyles[0]) : (brandStyleSet.has('Regular') ? 'Regular' : brandStyles[0]);
+};
+for (const t of fontSet ? allTexts() : []) {
   for (const seg of t.getStyledTextSegments(['fontName'])) {
-    if (seg.fontName.family === 'Plus Jakarta Sans') continue;
-    const fn = { family: 'Plus Jakarta Sans', style: toPjsStyle(seg.fontName.style) };
+    if (seg.fontName.family === FONT_FAMILY) continue;
+    const fn = { family: FONT_FAMILY, style: toBrandStyle(seg.fontName.style) };
     await figma.loadFontAsync(fn);
     t.setRangeFontName(seg.start, seg.end, fn); log.fontsFixed++;
   }
@@ -158,7 +168,7 @@ const texts = allTexts();
 const audit = {
   gridFrames: root.findAll(n => n.type === 'FRAME' && n.layoutMode === 'GRID').map(n => n.id),
   paddedPlainFrames: root.findAll(n => isAL(n) && !hasPaint(n) && pad(n) > 0).map(n => `${n.id} ${n.name} [${n.paddingTop},${n.paddingRight},${n.paddingBottom},${n.paddingLeft}]`),
-  nonJakartaFonts: [...new Set(texts.flatMap(t => t.getStyledTextSegments(['fontName']).map(s => s.fontName.family)))].filter(f => f !== 'Plus Jakarta Sans'),
+  offBrandFonts: fontSet ? [...new Set(texts.flatMap(t => t.getStyledTextSegments(['fontName']).map(s => s.fontName.family)))].filter(f => f !== FONT_FAMILY) : 'FONT_FAMILY not set',
   textWrappersLeft: root.findAll(n => n.type === 'FRAME' && n.children.length === 1 && n.children[0].type === 'TEXT' && !hasPaint(n)).length,
   textsNotFillOutsidePills: texts.filter(t => t.layoutSizingHorizontal !== 'FILL' && !inPill(t)).map(t => `${t.id} "${t.characters.slice(0, 24)}" (${t.layoutSizingHorizontal}, parent ${t.parent.layoutMode})`),
   shortShellColumns: root.findAll(n => n.type === 'FRAME' && isAL(n.parent) && n.parent.layoutMode === 'HORIZONTAL' && n.layoutSizingVertical === 'FIXED' && n.height >= 600 && n.height < n.parent.height - 40).map(n => n.id),
