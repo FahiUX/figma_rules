@@ -204,6 +204,7 @@ For dynamic tag clouds, filter chips, or badge lists that must break onto multip
 - Use `flex flex-row flex-wrap items-center gap-2.5 w-full`.
 - Each child chip MUST be `w-fit h-fit shrink-0 whitespace-nowrap`.
 - Never use fixed widths on wrapping chips.
+- **No `calc()` widths in wrap rows.** `w-[calc((100%-48px)/3)]` cards in a `flex-wrap` row export as Fill cards with odd grow values and **no wrap**: all cards cram into one row (~75px each) and the frame grows sideways (a 1440 page captured 1723 wide). Give wrap cards a plain fixed width (`w-[341px] shrink-0`) or build explicit rows of 3 with `flex-1` cards.
 - **Never put a label and a long pill group in one row.** If the `w-fit shrink-0` pill group can be wider than the row, the converter keeps it FIXED and the `flex-1` label is crushed to 1px (audit `narrowTexts`). Stack them instead: a `flex-col` holding the label (`w-full`), then the pills as a `w-full flex-row flex-wrap` row.
 
 ```tsx
@@ -351,7 +352,7 @@ Every screen goes into Figma through the **html->figma capture** (Figma MCP `gen
    - remove `position: fixed` dev overlays (module switcher, feedback annotator) before capture;
    - call `generate_figma_design` with the fileKey to get a captureId, inject `https://mcp.figma.com/mcp/html-to-design/capture.js`, run `window.figma.captureForDesign({ captureId, endpoint, selector: 'body' })`;
    - poll `generate_figma_design` with the captureId until `completed`; note the new node id.
-4. **Run the sweep.** Read `scripts/figma-sweep.js`, set `ROOT_ID` to the captured node id and `FONT_FAMILY` to the project font (see Project Settings), and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width and height, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, table truncation, the height formula (containers Hug, row cards/sidebar Fill), Fill-height shell columns, rounds squashed chart dots, and converts off-brand fonts.
+4. **Run the sweep.** Read `scripts/figma-sweep.js`, set `ROOT_ID` to the captured node id and `FONT_FAMILY` to the project font (see Project Settings), and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width and height, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, table truncation, the height formula (containers Hug, row cards/sidebar Fill), Fill-height shell columns, rounds squashed chart dots, converts off-brand fonts, and rescues labels squeezed to 1px by a sibling.
 5. **Check the audit it returns.** `gridFrames`, `minMaxLeft`, `fixedHeightContainers`, `offBrandFonts`, `textWrappersLeft`, `shortShellColumns`, `squashedDotsLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). `paddedPlainFrames` may only list the main canvas and card/hero content containers (buttons and full-width body sections of unpadded cards are whitelisted and not listed). Then screenshot the frame and look for overflow or squeezed text.
 6. **Place it on the canvas.** Run `scripts/figma-layout.js` with `PAGE_ID` (see Canvas Layout below). Never place screens by hand.
 7. **New edge case?** Fix it in `scripts/figma-sweep.js` (not by hand on one screen) so the next capture gets it for free.

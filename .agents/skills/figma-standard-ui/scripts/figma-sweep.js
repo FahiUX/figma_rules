@@ -18,6 +18,7 @@
 //  4b. Shell columns (sidebar) captured at screen height (h-screen sticky) -> Fill height of the page row.
 //  5. Squashed chart dots (circles from a stretched SVG) -> round again, same centre.
 //  6. Any text not in FONT_FAMILY (e.g. SVG <text> exported as Inter) -> FONT_FAMILY, same weight.
+//  6b. Rescues squeezed labels (Fill text crushed to 1px by a sibling) -> Hug.
 //  7. Returns an audit: GRID frames, padded plain frames, off-brand fonts, leftovers.
 
 const ROOT_ID = 'ROOT_ID';
@@ -186,6 +187,13 @@ for (const t of fontSet ? allTexts() : []) {
     await figma.loadFontAsync(fn);
     t.setRangeFontName(seg.start, seg.end, fn); log.fontsFixed++;
   }
+}
+
+// 7. rescue squeezed labels: a Fill text (or its 1px wrapper) crushed by a Fill/fixed sibling in a row -> Hug
+//    (e.g. a timestamp next to a Fill title, a "Prompts:" label next to a pill group)
+for (const t of allTexts().filter(t => t.width < 8 && t.characters.trim().length > 1 && !inPill(t))) {
+  hugText(t); log.textHug++;
+  for (let p = t.parent; p && isAL(p) && p.width < 8; p = p.parent) p.layoutSizingHorizontal = 'HUG';
 }
 
 // a full-width section of an unpadded card (e.g. the padded body under a card's image) is the card's own padding
