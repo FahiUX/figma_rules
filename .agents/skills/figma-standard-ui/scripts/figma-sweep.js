@@ -107,7 +107,9 @@ function visit(p) {
         if (k.layoutSizingHorizontal === 'FILL') {
           if (seenFill && k.type === 'TEXT') { hugText(k); log.textHug++; } else seenFill = true;
         } else if (k.type === 'TEXT' && k.layoutSizingHorizontal === 'FIXED') { hugText(k); log.textHug++; }
-        else if (k.type === 'FRAME' && k.layoutSizingHorizontal === 'FIXED') k.layoutSizingHorizontal = 'HUG';
+        // only a flat text group goes Hug; a fixed column (w-[340px] shrink-0 holding stacks) keeps its width,
+        // or its Fill texts collapse to 1px and the page grows thousands of px tall
+        else if (k.type === 'FRAME' && k.layoutSizingHorizontal === 'FIXED' && !k.children.some(isAL)) k.layoutSizingHorizontal = 'HUG';
       });
     }
   }
