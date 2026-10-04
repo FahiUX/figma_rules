@@ -19,9 +19,10 @@ While frontend code remains responsive (`w-full flex-1 min-w-0`), the primary re
 - Never design for unconstrained ultra-wide viewports that stretch content into illegible ribbons.
 
 ### 2. Main Container Resizing: Height HUG (`layoutSizingVertical = "HUG"`)
-The root screen wrapper and main content container MUST set **`Height: HUG`** (e.g. `min-h-screen h-auto flex flex-col`):
+The root screen wrapper and main content container MUST set **`Height: HUG`** (e.g. `h-auto flex flex-col`). `min-h-screen` exports as Figma **Min H = 900**; the sweep strips it, but prefer not to rely on it:
 - **Why**: Hardcoded heights (e.g. `h-[900px]`, `h-[1200px]`, or `h-screen` without overflow) create rigid fixed-height frames in Figma that clip child cards, break vertical auto-expansion, and create scroll traps.
 - **Rule**: Let inner child sections push the container height naturally (`Height: HUG`).
+- **Height formula, parent to leaf (same as width)**: every container is **Hug**; inside a row, cards/columns are **Fill** height except the tallest, which stays Hug and drives the row (equal-height cards, full-height sidebar). **Fixed** height only on leaf boxes: icons, avatars, images, thin tracks/dividers, equal-height table rows. The converter exports `flex-1` / `h-full` columns as Fill height inside a Hug parent, which collapses the page to the sidebar height; the sweep resets every container to Hug first (leaves up), then applies Fill to the rows (top down). Audit: `fixedHeightContainers` must be empty.
 
 ### 3. Canvas Content Padding: 40px All-Around (`p-10` / `padding: 40px`)
 The main work area / canvas content container must consistently use **`40px` padding on all 4 sides** (`p-10` or `px-10 py-10` / `Top: 40px, Right: 40px, Bottom: 40px, Left: 40px`):
@@ -203,6 +204,7 @@ For dynamic tag clouds, filter chips, or badge lists that must break onto multip
 - Use `flex flex-row flex-wrap items-center gap-2.5 w-full`.
 - Each child chip MUST be `w-fit h-fit shrink-0 whitespace-nowrap`.
 - Never use fixed widths on wrapping chips.
+- **Never put a label and a long pill group in one row.** If the `w-fit shrink-0` pill group can be wider than the row, the converter keeps it FIXED and the `flex-1` label is crushed to 1px (audit `narrowTexts`). Stack them instead: a `flex-col` holding the label (`w-full`), then the pills as a `w-full flex-row flex-wrap` row.
 
 ```tsx
 <div className="w-full flex flex-row flex-wrap items-center gap-2.5">
@@ -349,8 +351,8 @@ Every screen goes into Figma through the **html->figma capture** (Figma MCP `gen
    - remove `position: fixed` dev overlays (module switcher, feedback annotator) before capture;
    - call `generate_figma_design` with the fileKey to get a captureId, inject `https://mcp.figma.com/mcp/html-to-design/capture.js`, run `window.figma.captureForDesign({ captureId, endpoint, selector: 'body' })`;
    - poll `generate_figma_design` with the captureId until `completed`; note the new node id.
-4. **Run the sweep.** Read `scripts/figma-sweep.js`, set `ROOT_ID` to the captured node id and `FONT_FAMILY` to the project font (see Project Settings), and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, table truncation, Fill-height shell columns, rounds squashed chart dots, and converts off-brand fonts.
-5. **Check the audit it returns.** `gridFrames`, `offBrandFonts`, `textWrappersLeft`, `shortShellColumns`, `squashedDotsLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). `paddedPlainFrames` may only list the main canvas and card/hero content containers (buttons are whitelisted and not listed). Then screenshot the frame and look for overflow or squeezed text.
+4. **Run the sweep.** Read `scripts/figma-sweep.js`, set `ROOT_ID` to the captured node id and `FONT_FAMILY` to the project font (see Project Settings), and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width and height, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, table truncation, the height formula (containers Hug, row cards/sidebar Fill), Fill-height shell columns, rounds squashed chart dots, and converts off-brand fonts.
+5. **Check the audit it returns.** `gridFrames`, `minMaxLeft`, `fixedHeightContainers`, `offBrandFonts`, `textWrappersLeft`, `shortShellColumns`, `squashedDotsLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). `paddedPlainFrames` may only list the main canvas and card/hero content containers (buttons and full-width body sections of unpadded cards are whitelisted and not listed). Then screenshot the frame and look for overflow or squeezed text.
 6. **New edge case?** Fix it in `scripts/figma-sweep.js` (not by hand on one screen) so the next capture gets it for free.
 
 ### Project Settings
@@ -373,7 +375,7 @@ The skill is project-agnostic. Each project records its own values (e.g. in its 
 | Guardian Rule | Requirement | Why |
 | :--- | :--- | :--- |
 | **1440px Artboard Target** | Design base frame at 1440px width | Reference standard for desktop proportions and grid balance. |
-| **Height: HUG on Main Container** | Set container to `h-auto min-h-screen` | Prevents height truncation and fixed scrolling traps . |
+| **Height: HUG on Main Container** | Set container to `h-auto` (no `min-h-screen`) | Prevents height truncation and fixed scrolling traps . |
 | **40px Canvas Padding** | `p-10` on work area container | Ensures uniform breathable boundary across all screens . |
 | **Pixel Units Preferred** | Use explicit `px` (`h-[72px]`, `w-[280px]`) | Avoids `rem` font-scaling fractional drift during vector conversion. |
 | **H / V / Wrap Only** | `flex-row`, `flex-col`, `flex-wrap` and never `grid` | `grid-cols-*` exports as a Figma GRID frame. |
@@ -388,7 +390,7 @@ The skill is project-agnostic. Each project records its own values (e.g. in its 
 | **Absolute Positioning in AL** | `relative` parent + `absolute` child | Floating badges / live pips without breaking Auto Layout. |
 | **Wrap Direction (`flex-wrap`)** | `flex-wrap` with `shrink-0` chips | Responsive tag/filter clouds that wrap cleanly across lines. |
 | **Fit to Fill Text** | `w-full self-stretch` on headings & copy | Sets text to Horizontal Fill + Vertical Hug (auto height). |
-| **No min/max width** | Ban `max-w-*` and `min-w-[Npx]` | `max-w` locks width; `min-w-[Npx]` exports as Figma Min W. |
+| **No min/max width or height** | Ban `max-w-*`, `min-w-[Npx]`, `min-h-*`, `max-h-*` | They export as Figma Min/Max W/H; the sweep clears any that slip through. |
 | **No `items-baseline`** | Always use `items-center` | Prevents fallback to absolute manual coordinates in Figma. |
 | **No Pseudo-elements** | Avoid `::before` / `::after` for UI | Exporters drop pseudo elements; use explicit JSX elements. |
 | **No `ml-auto`** | Use `justify-between` or nested frames | Auto-margins fail to translate to Auto Layout alignment. |

@@ -5,7 +5,7 @@
 // Safe to re-run: every step is idempotent.
 //
 // What it does (in order):
-//  1. Cap giant radii (>9999 -> 9999), clear every min/max width.
+//  1. Cap giant radii (>9999 -> 9999), clear every min/max width AND height (min-h-screen exports as Min H 900).
 //  2. Unwrap converter "Text" frames: a plain frame holding a single TEXT is removed and the
 //     TEXT moves into the parent auto layout directly.
 //  3. Sizing, top-down:
@@ -14,6 +14,7 @@
 //     - HORIZONTAL row: exactly one text element is Fill (the first); later texts -> Hug.
 //     - Buttons, badges, pills and anything inside them keep Hug text.
 //  4. Text inside short fixed-height cells (table rows/headers <= 80px) truncates to 1 line.
+//  4a. Height, parent to leaf: containers Hug; cards/columns in a row Fill (tallest stays Hug); Fixed only on leaf boxes.
 //  4b. Shell columns (sidebar) captured at screen height (h-screen sticky) -> Fill height of the page row.
 //  5. Squashed chart dots (circles from a stretched SVG) -> round again, same centre.
 //  6. Any text not in FONT_FAMILY (e.g. SVG <text> exported as Inter) -> FONT_FAMILY, same weight.
@@ -51,13 +52,15 @@ const fonts = new Map();
 for (const t of allTexts()) for (const s of t.getStyledTextSegments(['fontName'])) fonts.set(JSON.stringify(s.fontName), s.fontName);
 await Promise.all([...fonts.values()].map(f => figma.loadFontAsync(f)));
 
-const log = { radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, dotsRounded: 0, fontsFixed: 0, shellFill: 0 };
+const log = { radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, dotsRounded: 0, fontsFixed: 0, shellFill: 0, heightHug: 0, heightFill: 0 };
 
-// 1. radii + min/max width
+// 1. radii + min/max width + min/max height
 for (const n of [root, ...root.findAll(() => true)]) {
   if ('cornerRadius' in n && typeof n.cornerRadius === 'number' && n.cornerRadius > 9999) { n.cornerRadius = 9999; log.radii++; }
   if ('minWidth' in n && n.minWidth != null) { n.minWidth = null; log.minMax++; }
   if ('maxWidth' in n && n.maxWidth != null) { n.maxWidth = null; log.minMax++; }
+  if ('minHeight' in n && n.minHeight != null) { n.minHeight = null; log.minMax++; }
+  if ('maxHeight' in n && n.maxHeight != null) { n.maxHeight = null; log.minMax++; }
 }
 // absolute overlay pinned across its parent (left+right) exported as Hug -> fixed width so its rows/text can Fill
 for (const n of root.findAll(n => isAL(n) && n.layoutPositioning === 'ABSOLUTE' && n.layoutSizingHorizontal === 'HUG' && n.parent && n.width >= n.parent.width * 0.75)) {
@@ -120,7 +123,26 @@ for (const t of allTexts()) {
   }
 }
 
-// 5. audit
+// 4a. height, parent to leaf: every container Hug; in a row, cards/columns Fill except the tallest (it drives the row).
+//     Fixed height stays only on leaf boxes: icons/avatars, images, thin tracks/dividers, equal-height table rows.
+const hasImage = n => 'fills' in n && Array.isArray(n.fills) && n.fills.some(f => f.type === 'IMAGE' && f.visible !== false);
+const isTableRow = n => n.height <= 80 && n.parent && 'children' in n.parent &&
+  n.parent.children.filter(s => s.type === 'FRAME' && s.layoutSizingVertical === 'FIXED' && Math.abs(s.height - n.height) < 1).length >= 3;
+const keepFixedH = n => isIcon(n) || hasImage(n) || (n.height <= 12 && !n.findOne(t => t.type === 'TEXT')) || isTableRow(n);
+const hFrames = [root, ...root.findAll(n => isAL(n) && n.visible && n.layoutPositioning !== 'ABSOLUTE')].filter(isAL);
+// pass 1, leaves first: reset every container (Fixed OR converter Fill) to Hug, so each one measures its real content.
+// A converter Fill (flex-1 / h-full) inside a Hug parent otherwise collapses the whole page to the sidebar height.
+for (const n of hFrames.slice().reverse())
+  if (n.layoutSizingVertical !== 'HUG' && n.children.length && !keepFixedH(n) && !(isAL(n.parent) && keepFixedH(n.parent))) { n.layoutSizingVertical = 'HUG'; log.heightHug++; }
+// pass 2, parent to leaf: in a row, every card/column shorter than the tallest -> Fill (equal-height cards, full-height sidebar)
+for (const row of hFrames) {
+  if (row.layoutMode !== 'HORIZONTAL' || isPill(row) || inPill(row)) continue;
+  const cols = row.children.filter(k => isAL(k) && k.visible && k.layoutPositioning !== 'ABSOLUTE' && k.layoutSizingVertical === 'HUG' && !isPill(k) && !isPillGroup(k) && !keepFixedH(k));
+  if (cols.length < 2) continue;
+  const tallest = Math.max(...cols.map(k => k.height));
+  for (const k of cols) if (k.height < tallest - 1) { k.layoutSizingVertical = 'FILL'; log.heightFill++; }
+}
+
 // 4b. shell columns: a tall column (e.g. sidebar) in a horizontal page row, fixed at the viewport height
 //     while the row is taller -> Fill height so it runs the full page
 for (const row of [root, ...root.findAll(n => isAL(n) && n.layoutMode === 'HORIZONTAL')]) {
@@ -164,10 +186,14 @@ for (const t of fontSet ? allTexts() : []) {
   }
 }
 
+// a full-width section of an unpadded card (e.g. the padded body under a card's image) is the card's own padding
+const isCardSection = n => { const p = n.parent; return p && p.type === 'FRAME' && hasPaint(p) && pad(p) === 0 && typeof p.cornerRadius === 'number' && p.cornerRadius >= 12 && n.width >= p.width - 4; };
 const texts = allTexts();
 const audit = {
   gridFrames: root.findAll(n => n.type === 'FRAME' && n.layoutMode === 'GRID').map(n => n.id),
-  paddedPlainFrames: root.findAll(n => isAL(n) && !hasPaint(n) && pad(n) > 0 && !n.name.startsWith('Button')).map(n => `${n.id} ${n.name} [${n.paddingTop},${n.paddingRight},${n.paddingBottom},${n.paddingLeft}]`),
+  fixedHeightContainers: [root, ...root.findAll(n => isAL(n) && n.visible)].filter(n => isAL(n) && n.layoutSizingVertical === 'FIXED' && !keepFixedH(n)).map(n => `${n.id} ${n.name} ${Math.round(n.height)}`),
+  minMaxLeft: [root, ...root.findAll(() => true)].filter(n => ['minWidth','maxWidth','minHeight','maxHeight'].some(k => k in n && n[k] != null)).map(n => n.id),
+  paddedPlainFrames: root.findAll(n => isAL(n) && !hasPaint(n) && pad(n) > 0 && !n.name.startsWith('Button') && !isCardSection(n)).map(n => `${n.id} ${n.name} [${n.paddingTop},${n.paddingRight},${n.paddingBottom},${n.paddingLeft}]`),
   offBrandFonts: fontSet ? [...new Set(texts.flatMap(t => t.getStyledTextSegments(['fontName']).map(s => s.fontName.family)))].filter(f => f !== FONT_FAMILY) : 'FONT_FAMILY not set',
   textWrappersLeft: root.findAll(n => n.type === 'FRAME' && n.children.length === 1 && n.children[0].type === 'TEXT' && !hasPaint(n)).length,
   textsNotFillOutsidePills: texts.filter(t => t.layoutSizingHorizontal !== 'FILL' && !inPill(t)).map(t => `${t.id} "${t.characters.slice(0, 24)}" (${t.layoutSizingHorizontal}, parent ${t.parent.layoutMode})`),
