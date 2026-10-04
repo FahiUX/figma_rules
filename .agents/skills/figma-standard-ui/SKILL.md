@@ -1,6 +1,6 @@
 ---
 name: figma-standard-ui
-description: Enforces strict Figma Auto Layout architecture for frontend code (React, TSX, Tailwind, HTML). Ensures all generated UI translates 1:1 into native Figma Auto Layout frames with 1440px desktop baseline, Hug height containers, 40px canvas padding, pixel units, Gap-only spacing, multi-level nesting, absolute badge positioning, wrap rows, column tables, vector charts, no min/max width or height, and Fill x Hug text. Includes the html->figma capture workflow, a required post-capture sweep script (scripts/figma-sweep.js), and a canvas layout formula + script for sections, x/y and gaps (scripts/figma-layout.js). Use when building UI meant for Figma handoff, design systems, or html-to-figma exports.
+description: Enforces strict Figma Auto Layout architecture for frontend code (React, TSX, Tailwind, HTML). Ensures all generated UI translates 1:1 into native Figma Auto Layout frames with 1440px desktop baseline, Hug height containers, 40px canvas padding, pixel units, Gap-only spacing, multi-level nesting, absolute badge positioning, wrap rows, column tables, vector charts, no min/max width or height, and Fill x Hug text. Includes the html->figma capture workflow, a required post-capture sweep script (scripts/figma-sweep.js), and a canvas layout formula + script for sections, x/y, gaps and arrow links between screens (scripts/figma-layout.js). Use when building UI meant for Figma handoff, design systems, or html-to-figma exports.
 ---
 
 # Figma-Standard UI Architecture Skill
@@ -363,6 +363,7 @@ Every screen sits on the canvas by one formula, so any agent can compute a posit
 - **Inside a section**: one row, left to right by screen number, top-aligned: frame `i` at `x = P + sum(previous widths) + i*G`, `y = P`. Section = `2P + sum(widths) + (n-1)*G` wide, `2P + tallest frame` high.
 - **Sections**: `x = 0`, stacked top to bottom, each `S` below the previous. A new layout starts `S` below existing content it doesn't own.
 - **Coordinates**: a frame's x/y inside a SECTION are section-relative, not page-absolute. All values whole pixels.
+- **Links (arrows between screens)**: list them as `EDGES = [[fromFrameId, toFrameId, 'label']]` (label = the action, e.g. "Open client case"). Same section: **frame → frame**, straight across the gap at `Y0 = 450` below the frame top, label above the line. Different sections: **section → section** — next section below: bottom edge → top edge straight down; back up: lower section's top edge → upper section's **right** edge; skipping a section: left edge → left-margin track → target's **left** edge (shorter span takes the inner track, so lines never cross; an incoming port sits `IN = 160` below the outgoing one). Lines and labels are loose page layers named `Link · …` / `Label · …` — **never grouped**; each run replaces them by name.
 - **Script**: `scripts/figma-layout.js`. `PLAN = [...]` builds/refreshes named sections (renames frames if given); `PLAN = 'AUTO'` re-lays out the page's numbered sections (`NN - Name`; others untouched) after a re-capture changed heights. Moves and renames only, never deletes.
 
 ### Project Settings
