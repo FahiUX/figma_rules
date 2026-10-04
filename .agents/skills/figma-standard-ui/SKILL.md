@@ -1,6 +1,6 @@
 ---
 name: figma-standard-ui
-description: Enforces strict Figma Auto Layout architecture for frontend code (React, TSX, Tailwind, HTML). Ensures all generated UI translates 1:1 into native Figma Auto Layout frames with 1440px desktop baseline, Hug height containers, 40px canvas padding, pixel units, Gap-only spacing, multi-level nesting, absolute badge positioning, wrap rows, column tables, vector charts, no min/max width, and Fill x Hug text. Includes the html->figma capture workflow and a required post-capture sweep script (scripts/figma-sweep.js). Use when building UI meant for Figma handoff, design systems, or html-to-figma exports.
+description: Enforces strict Figma Auto Layout architecture for frontend code (React, TSX, Tailwind, HTML). Ensures all generated UI translates 1:1 into native Figma Auto Layout frames with 1440px desktop baseline, Hug height containers, 40px canvas padding, pixel units, Gap-only spacing, multi-level nesting, absolute badge positioning, wrap rows, column tables, vector charts, no min/max width or height, and Fill x Hug text. Includes the html->figma capture workflow, a required post-capture sweep script (scripts/figma-sweep.js), and a canvas layout formula + script for sections, x/y and gaps (scripts/figma-layout.js). Use when building UI meant for Figma handoff, design systems, or html-to-figma exports.
 ---
 
 # Figma-Standard UI Architecture Skill
@@ -353,7 +353,17 @@ Every screen goes into Figma through the **html->figma capture** (Figma MCP `gen
    - poll `generate_figma_design` with the captureId until `completed`; note the new node id.
 4. **Run the sweep.** Read `scripts/figma-sweep.js`, set `ROOT_ID` to the captured node id and `FONT_FAMILY` to the project font (see Project Settings), and pass it to `use_figma` (load the `figma-use` skill first). It caps radii, clears min/max width and height, unwraps text frames, applies Fill × Hug text, one Fill per row, full-width buttons Fill, table truncation, the height formula (containers Hug, row cards/sidebar Fill), Fill-height shell columns, rounds squashed chart dots, and converts off-brand fonts.
 5. **Check the audit it returns.** `gridFrames`, `minMaxLeft`, `fixedHeightContainers`, `offBrandFonts`, `textWrappersLeft`, `shortShellColumns`, `squashedDotsLeft` and `narrowTexts` must be empty. `textsNotFillOutsidePills` may only list row values (Hug by rule). `paddedPlainFrames` may only list the main canvas and card/hero content containers (buttons and full-width body sections of unpadded cards are whitelisted and not listed). Then screenshot the frame and look for overflow or squeezed text.
-6. **New edge case?** Fix it in `scripts/figma-sweep.js` (not by hand on one screen) so the next capture gets it for free.
+6. **Place it on the canvas.** Run `scripts/figma-layout.js` with `PAGE_ID` (see Canvas Layout below). Never place screens by hand.
+7. **New edge case?** Fix it in `scripts/figma-sweep.js` (not by hand on one screen) so the next capture gets it for free.
+
+### 🗺️ Canvas Layout (Sections, X/Y, Gaps)
+Every screen sits on the canvas by one formula, so any agent can compute a position instead of guessing:
+- **Hierarchy**: Page = one module (`01 - Manufacturer`); Section = one feature/tab (`01 - Dashboard`); Frame = one screen state (`M1.01 - Dashboard · Default`). Shared parts (sidebar, header, modals) get `00 - Shared Components`; superseded captures go to `99 - Old Captures`, never deleted.
+- **Constants**: `P = 160` section padding (all sides), `G = 200` gap between frames, `S = 400` gap between sections. Frame width = the desktop width (1440), or 430 for mobile; height Hug.
+- **Inside a section**: one row, left to right by screen number, top-aligned: frame `i` at `x = P + sum(previous widths) + i*G`, `y = P`. Section = `2P + sum(widths) + (n-1)*G` wide, `2P + tallest frame` high.
+- **Sections**: `x = 0`, stacked top to bottom, each `S` below the previous. A new layout starts `S` below existing content it doesn't own.
+- **Coordinates**: a frame's x/y inside a SECTION are section-relative, not page-absolute. All values whole pixels.
+- **Script**: `scripts/figma-layout.js`. `PLAN = [...]` builds/refreshes named sections (renames frames if given); `PLAN = 'AUTO'` re-lays out the page's numbered sections (`NN - Name`; others untouched) after a re-capture changed heights. Moves and renames only, never deletes.
 
 ### Project Settings
 The skill is project-agnostic. Each project records its own values (e.g. in its `CLAUDE.md`) and the agent passes them to the sweep:
