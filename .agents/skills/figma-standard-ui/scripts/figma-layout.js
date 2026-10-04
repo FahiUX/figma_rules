@@ -22,7 +22,7 @@
 //   next section below      section bottom edge -> section top edge, straight down (bends in the gap if not aligned)
 //   previous section above  lower section top edge -> upper section right edge (L just right of it, else right margin)
 //   skips a section         section left edge -> left-margin track -> target section left edge
-//                           (shorter span = inner track, so lines never cross; incoming ports sit IN below outgoing)
+//                           (each edge has port slots IN apart; outer links take outer slots + outer tracks: no crossings)
 // Lines and labels are loose page children named "Link · <label>" / "Label · <label>" (never grouped);
 // every run removes the old ones by name and redraws, so re-run after any re-capture or move.
 
@@ -35,7 +35,7 @@ const PLAN = 'AUTO';
 const EDGES = [];
 // const EDGES = [['12:3', '15:2', 'Open product'], ['15:2', '15:9', 'Step 02'], ['15:9', '12:3', 'Back to Dashboard']];
 const P = 160, G = 200, S = 400;
-const Y0 = 450, IN = 160, MARGIN = 200, TRACK = 280, STROKE = 6;
+const Y0 = 450, IN = 160, MARGIN = 200, TRACK = 320, STROKE = 6;
 const FONT_FAMILY = 'FONT_FAMILY'; // project font for labels, same setting as the sweep (falls back to Inter)
 const LABEL_FONT = { family: FONT_FAMILY !== 'FONT_FAMILY' ? FONT_FAMILY : 'Inter', style: 'Bold' };
 const NAVY = { r: 27 / 255, g: 37 / 255, b: 75 / 255 };
@@ -99,24 +99,33 @@ if (EDGES.length) {
     const s = f.parent.type === 'SECTION' ? f.parent : null;
     return { s, x: (s ? s.x : 0) + f.x, y: (s ? s.y : 0) + f.y, r: (s ? s.x : 0) + f.x + f.width };
   };
-  const routes = [], margin = [];
+  const routes = [], margin = [], counters = {};
+  const bump = key => (counters[key] = (counters[key] ?? -1) + 1);
   for (const [from, to, label] of EDGES) {
     const fa = await frameBox(from), fb = await frameBox(to);
     const ia = secs.indexOf(fa.s), ib = secs.indexOf(fb.s);
     if (ia === ib) { const y = fa.y + Y0; routes.push({ label, pts: [{ x: fa.r, y }, { x: fb.x, y }], at: { x: (fa.r + fb.x) / 2, y: y - 40 }, above: true }); continue; }
     const A = secBox(fa.s), B = secBox(fb.s);
     if (ib === ia + 1) {
-      const x = A.cx, mid = A.b + S / 2;
+      const c = bump(`fwd${A.s.id}`), x = A.cx + c * IN, mid = A.b + S / 2 + c * 40;
       routes.push({ label, pts: x >= B.x && x <= B.r ? [{ x, y: A.b }, { x, y: B.y }] : [{ x, y: A.b }, { x, y: mid }, { x: B.cx, y: mid }, { x: B.cx, y: B.y }], at: { x, y: mid } });
     } else if (ib === ia - 1) {
-      if (A.r > B.r + G) { const x = B.r + G; routes.push({ label, pts: [{ x, y: A.y }, { x, y: B.anchor }, { x: B.r, y: B.anchor }], at: { x, y: (A.y + B.anchor) / 2 } }); }
-      else { const x = Math.max(A.r, B.r) + G; routes.push({ label, pts: [{ x: A.r, y: A.anchor }, { x, y: A.anchor }, { x, y: B.anchor }, { x: B.r, y: B.anchor }], at: { x, y: (A.anchor + B.anchor) / 2 } }); }
-    } else margin.push({ A, B, label });
+      const c = bump(`back${B.s.id}`), ty = B.anchor + c * IN; // each arrival on the right edge gets its own slot
+      if (A.r > B.r + G + c * 80) { const x = B.r + G + c * 80; routes.push({ label, pts: [{ x, y: A.y }, { x, y: ty }, { x: B.r, y: ty }], at: { x, y: (A.y + ty) / 2 } }); }
+      else { const x = Math.max(A.r, B.r) + G + c * 80; routes.push({ label, pts: [{ x: A.r, y: A.anchor }, { x, y: A.anchor }, { x, y: ty }, { x: B.r, y: ty }], at: { x, y: (A.anchor + ty) / 2 } }); }
+    } else margin.push({ A, B, ia, ib, label });
   }
-  margin.forEach(m => { m.y1 = m.A.anchor; m.y2 = m.B.anchor + IN; m.span = Math.abs(m.y2 - m.y1); });
-  margin.sort((p, q) => p.span - q.span).forEach((m, k) => {
-    const tx = -MARGIN - k * TRACK;
-    routes.push({ label: m.label, pts: [{ x: m.A.x, y: m.y1 }, { x: tx, y: m.y1 }, { x: tx, y: m.y2 }, { x: m.B.x, y: m.y2 }], at: { x: tx, y: (m.y1 + m.y2) / 2 } });
+  // skip links: each section's left edge has port slots (anchor + k*IN). Outermost links first: they take the
+  // outer slots (upper end -> top slot, lower end -> bottom slot) and the outer tracks, so nested links never cross.
+  const slots = new Map();
+  margin.forEach(m => { m.up = m.ia < m.ib ? m.A : m.B; m.lo = m.ia < m.ib ? m.B : m.A; m.dist = Math.abs(m.ib - m.ia);
+    for (const e of [m.up, m.lo]) { const v = slots.get(e.s.id) || { n: 0, used: new Set() }; v.n++; slots.set(e.s.id, v); } });
+  const take = (e, top) => { const v = slots.get(e.s.id); let k = top ? 0 : v.n - 1; while (v.used.has(k)) k += top ? 1 : -1; v.used.add(k); return e.anchor + k * IN; };
+  margin.sort((p, q) => q.dist - p.dist).forEach((m, i) => {
+    const yUp = take(m.up, true), yLo = take(m.lo, false);
+    const [y1, y2] = m.ia < m.ib ? [yUp, yLo] : [yLo, yUp];
+    const tx = -MARGIN - (margin.length - 1 - i) * TRACK;
+    routes.push({ label: m.label, pts: [{ x: m.A.x, y: y1 }, { x: tx, y: y1 }, { x: tx, y: y2 }, { x: m.B.x, y: y2 }], at: { x: tx, y: (y1 + y2) / 2 } });
   });
   for (const r of routes) {
     const pts = r.pts.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }));
