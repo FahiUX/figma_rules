@@ -1,6 +1,8 @@
 # Post-Capture Repair Checklist
 
-The sweep (`scripts/figma-sweep.js`) fixes the converter's general mess. These are the breakages it still leaves (or causes), learned on a 7-module, 400-screen project. Each rule has **Detect** (how to find every instance with a script) and **Fix**.
+The sweep (`scripts/figma-sweep.js`) fixes the converter's general mess. These are the breakages learned on a 7-module, 400-screen project. Each rule has **Detect** (how to find every instance with a script) and **Fix**.
+
+**Automatic since the sweep update (tested on real captures):** collapsed buttons/inputs, squashed circles, textareas, column-table headers/widths/strokes, free-form card grids → GRID, `Label:` rows, separators, space-between right text, text link + arrow, wrapped chips, off-centre pills, overflowing Hug text, grey shadow boxes. The sweep audit lists anything left (`collapsedButtons`, `ovalCircles`, `labelsFill`, `collapsedTableColumns`). Everything else below still needs a person or agent to judge: equal-height cards, side-by-side card heights, rows that cannot fit, overlays, shell, shared-view transfers, ragged list rows, nav label wording.
 
 ## How to run it
 1. **Page-wide, every time.** Run each rule over the whole page and every page that shares the pattern, never only the frame the user pointed at. When a new rule is added, back-fill it on screens finished before it.
