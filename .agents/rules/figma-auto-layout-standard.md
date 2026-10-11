@@ -16,11 +16,11 @@ When writing or modifying UI code (.tsx, React, Tailwind CSS, HTML), strictly mi
 
 5. **AUTO LAYOUT ONLY (NO CSS GRID):**
    - Always use `flex flex-col` (Vertical Frame), `flex flex-row` (Horizontal Frame), or `flex flex-row flex-wrap` (Wrap Frame).
-   - NEVER use `display: grid` or `grid-cols-*`.
+   - NEVER use `display: grid` or `grid-cols-*`. Exception: a card grid with MORE THAN 6 cards may use `grid grid-cols-N` (Figma GRID: columns FLEX, rows HUG, cards FILL, equal heights).
 
 6. **SPACING (GAP & PADDING ONLY):**
    - Use ONLY `gap-*` for spacing between sibling elements and row containers.
-   - Use ONLY `p-*`, `px-*`, `py-*` on whitelisted boundary containers (Main Container `p-6`/`p-8`, Canvas `p-10`, Button `px-4 py-2`, Badge `px-2 py-0.5`). Everything else is `padding: 0`.
+   - Use ONLY `p-*`, `px-*`, `py-*` on whitelisted boundary containers (Main Container `p-6`/`p-8`, Canvas `p-10`, Button `px-5 py-2.5`, Badge `px-2 py-0.5`). Everything else is `padding: 0`.
    - STRICTLY BANNED: Margins (`mt-*`, `mb-*`, `ml-*`, `mr-*`, `space-y-*`, `space-x-*`) and empty spacer `<div />` elements.
 
 7. **SIZING CONSTRAINTS (FILL VS HUG VS FIXED):**
@@ -58,3 +58,12 @@ When writing or modifying UI code (.tsx, React, Tailwind CSS, HTML), strictly mi
 14. **POST-CAPTURE SWEEP & LAYOUT SCRIPT:**
     - Run `scripts/figma-sweep.js` on every html->figma capture to guarantee 100% Fill × Hug, unwrapped text frames, and clean auto layout without manual fixes.
     - Run `scripts/figma-layout.js` to compute neat section and screen placement on the Figma canvas.
+
+15. **RETRO RULES (learned on a 400-screen project):**
+    - **No truncation**: no `truncate` / `line-clamp` / `…`; show full text and let containers grow (only fixed-height table rows and single-line inputs truncate). Nav labels stay on one line: shorten the name instead.
+    - **Hug text follows the code**: `flex-1` text = Fill, `w-fit` text = Hug. Text + badge rows, `Label:` labels, right-hand text in `justify-between` rows and text links with an arrow are Hug.
+    - **Height from padding**: buttons, pills and inputs use `py-*`, never a fixed `h-*` (it collapses on capture). Standard button `px-5 py-2.5 leading-4 text-[12px]` = 36px; search input `px-3.5 py-2.5` = 38px.
+    - **Circles stay square** (`w-8 h-8`, Fixed w × w); a badge with 2+ characters is a pill.
+    - **Tables**: no column strokes, header text Hug and aligned like its column, one action button style per column.
+    - **Capture every state**: each tab, toggle, accordion, view mode, drawer and modal gets its own Figma frame. Then run `references/figma-repair-rules.md` page-wide.
+    - **Canvas**: frame gap 500, links orthogonal; prototype wired from the code, DISSOLVE 150 ms EASE_IN_AND_OUT.

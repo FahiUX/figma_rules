@@ -10,17 +10,19 @@ This repository defines the Figma-Standard UI Architecture and automation script
 
 ## Core Architecture Directives for Antigravity
 1. **Desktop Baseline**: Reference 1440px desktop width (`1440 × 900` or `1440 × Hug`).
-2. **Auto Layout Only**: Use `flex-col`, `flex-row`, `flex-wrap`. BANNED: CSS Grid (`grid-cols-*`).
+2. **Auto Layout Only**: Use `flex-col`, `flex-row`, `flex-wrap`. BANNED: CSS Grid (`grid-cols-*`). Exception: a card grid with MORE THAN 6 cards may use `grid grid-cols-N` (Figma GRID: columns FLEX, rows HUG, cards FILL, equal heights).
 3. **Height**: Root and main work area MUST use `Height: HUG` (`h-auto flex flex-col`). Never use fixed pixel heights.
 4. **Padding & Spacing**:
    - Spacing: `gap-*` only on parents. BANNED: `margin` (`mt-*`, `mb-*`, `ml-*`, `mr-*`, `space-y-*`, `space-x-*`) and empty spacer `<div>`s.
-   - Padding whitelist: Main container (`p-6`/`p-8`), Canvas (`p-10` = 40px), Button (`px-4 py-2`), Badge (`px-2 py-0.5`). All inner rows/stacks: `padding = 0`.
+   - Padding whitelist: Main container (`p-6`/`p-8`), Canvas (`p-10` = 40px), Button (`px-5 py-2.5`, height from padding, never `h-*`), Badge (`px-2 py-0.5`). All inner rows/stacks: `padding = 0`.
 5. **Sizing Constraints**:
    - Card containers: `items-stretch`
    - Inner stacks & text: `w-full self-stretch flex flex-col items-stretch`
    - Text layers: Fill Horizontal × Hug Vertical (`w-full self-stretch`). In flex rows: `flex-1 min-w-0`.
 6. **No Min / Max Width or Height**: BANNED: `max-w-*` (causes fixed-width freezing in Figma) and pixel `min-w-*` (`min-w-[220px]`).
 7. **Dividers**: Dedicated 1px layer `<div className="w-full h-px bg-neutral-200 shrink-0" />`. BANNED: `border-b pb-*`.
+8. **No Truncation**: show full text (only fixed table rows and single-line inputs truncate). Hug text follows the code: `flex-1` = Fill, `w-fit` = Hug (text + badge, `Label:`, links).
+9. **Retro rules**: circles square, no table column strokes, capture every state, frame gap 500, prototype DISSOLVE 150 ms. Full list: `SKILL.md` + `references/figma-repair-rules.md`.
 
 ## Capture Workflow for Antigravity
 1. Start dev server (`npm run dev` or `npx vite --port 5180`).

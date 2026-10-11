@@ -10,7 +10,7 @@ When AI agents write frontend code, they use arbitrary CSS: `margin-bottom`, emp
 
 ## The Solution
 This skill forces AI agents (Claude Code, Antigravity, OpenHands, Codex) to code strictly using **Figma's Auto Layout mental model**:
-1. **Flexbox Only**: `flex-col` (Vertical), `flex-row` (Horizontal), and `flex-wrap` (Wrap). Zero CSS Grid.
+1. **Flexbox First**: `flex-col` (Vertical), `flex-row` (Horizontal), and `flex-wrap` (Wrap). CSS Grid only for card grids with more than 6 cards.
 2. **Gap & Padding Only**: Zero margins (`mb-*`, `mt-*`) and zero spacer divs. Padding only on whitelisted outer containers, canvas (`p-10`), buttons, and badges.
 3. **1440px Desktop Baseline**: Root and canvas resolve balanced with optical hierarchy at 1440px width.
 4. **Height: HUG**: Containers use `h-auto flex flex-col` (never fixed pixel heights or `min-h-screen`).
@@ -21,6 +21,8 @@ This skill forces AI agents (Claude Code, Antigravity, OpenHands, Codex) to code
 9. **Post-Capture Sweep & Layout Automation**: 
    - `scripts/figma-sweep.js`: sweeps captured frames, unwrapping converter artifacts and applying Fill × Hug across all texts.
    - `scripts/figma-layout.js`: places screens in neat module sections with automated navigation edge links.
+   - `references/figma-repair-rules.md`: the post-capture repair checklist (Detect + Fix per known breakage), run page-wide after the sweep.
+10. **No Truncation & Code-Faithful Hug**: full text always; Hug vs Fill follows the TSX class (`flex-1` = Fill, `w-fit` = Hug).
 
 ---
 

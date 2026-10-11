@@ -2,7 +2,7 @@
 // Run with the Figma MCP `use_figma` tool AFTER the sweep. Arranges screens on a page with one fixed formula:
 //
 //   Page    = one module          Section = one feature/tab          Frame = one screen state
-//   P = 160  section padding (all sides)      G = 200  gap between frames      S = 400  gap between sections
+//   P = 160  section padding (all sides)      G = 500  gap between frames      S = 400  gap between sections
 //   frame i inside a section:  x = P + sum(previous widths) + i*G,  y = P      (one row, top-aligned)
 //   section size:              width = 2P + sum(widths) + (n-1)*G,  height = 2P + tallest frame
 //   sections:                  x = 0, stacked top to bottom, each S below the previous one
@@ -34,7 +34,7 @@ const PLAN = 'AUTO';
 // ];
 const EDGES = [];
 // const EDGES = [['12:3', '15:2', 'Open product'], ['15:2', '15:9', 'Step 02'], ['15:9', '12:3', 'Back to Dashboard']];
-const P = 160, G = 200, S = 400;
+const P = 160, G = 500, S = 400;
 const Y0 = 450, IN = 160, MARGIN = 200, TRACK = 320, STROKE = 6;
 const FONT_FAMILY = 'FONT_FAMILY'; // project font for labels, same setting as the sweep (falls back to Inter)
 const LABEL_FONT = { family: FONT_FAMILY !== 'FONT_FAMILY' ? FONT_FAMILY : 'Inter', style: 'Bold' };

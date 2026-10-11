@@ -13,7 +13,8 @@
 //       inner width (converter exported it FIXED) -> Fill. Full-width buttons/tracks -> Fill.
 //     - HORIZONTAL row: exactly one text element is Fill (the first); later texts -> Hug.
 //     - Buttons, badges, pills and anything inside them keep Hug text.
-//  4. Text inside short fixed-height cells (table rows/headers <= 80px) truncates to 1 line.
+//  4. NO truncation: clears any truncation the converter left, except text in real table rows
+//     (3+ sibling cells with the same fixed height <= 80px), which truncates to 1 line.
 //  4a. Height, parent to leaf: containers Hug; cards/columns in a row Fill (tallest stays Hug); Fixed only on leaf boxes.
 //  4b. Shell columns (sidebar) captured at screen height (h-screen sticky) -> Fill height of the page row.
 //  5. Squashed chart dots (circles from a stretched SVG) -> round again, same centre.
@@ -53,7 +54,7 @@ const fonts = new Map();
 for (const t of allTexts()) for (const s of t.getStyledTextSegments(['fontName'])) fonts.set(JSON.stringify(s.fontName), s.fontName);
 await Promise.all([...fonts.values()].map(f => figma.loadFontAsync(f)));
 
-const log = { radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, dotsRounded: 0, fontsFixed: 0, shellFill: 0, heightHug: 0, heightFill: 0 };
+const log = { radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, untruncated: 0, dotsRounded: 0, fontsFixed: 0, shellFill: 0, heightHug: 0, heightFill: 0 };
 
 // 1. radii + min/max width + min/max height
 for (const n of [root, ...root.findAll(() => true)]) {
@@ -118,12 +119,15 @@ function visit(p) {
 }
 visit(root);
 
-// 4. one-line truncation inside short fixed-height cells (tables)
+// 4. NO truncation: show full text everywhere. Only real table rows (3+ sibling cells sharing one fixed
+//    height <= 80px) keep text on one line. Single-line inputs are handled by the repair checklist.
+const isRowCell = c => c.type === 'FRAME' && c.layoutSizingVertical === 'FIXED' && c.height <= 80 && c.parent && 'children' in c.parent &&
+  c.parent.children.filter(s => s.type === 'FRAME' && s.layoutSizingVertical === 'FIXED' && Math.abs(s.height - c.height) < 1).length >= 3;
 for (const t of allTexts()) {
-  if (inPill(t)) continue;
-  for (let c = t.parent, i = 0; c && i < 3; c = c.parent, i++) {
-    if (c.type === 'FRAME' && c.layoutSizingVertical === 'FIXED' && c.height <= 80) { t.textTruncation = 'ENDING'; t.maxLines = 1; log.truncated++; break; }
-  }
+  let inRow = false;
+  if (!inPill(t)) for (let c = t.parent, i = 0; c && i < 3; c = c.parent, i++) if (isRowCell(c)) { inRow = true; break; }
+  if (inRow) { t.textTruncation = 'ENDING'; t.maxLines = 1; log.truncated++; }
+  else if (t.textTruncation !== 'DISABLED') { t.textTruncation = 'DISABLED'; t.maxLines = null; log.untruncated++; }
 }
 
 // 4a. height, parent to leaf: every container Hug; in a row, cards/columns Fill except the tallest (it drives the row).
