@@ -68,6 +68,7 @@ Provides automated, zero-defect asset extraction, deduplication, categorization,
 ```
 
 ### v2 Asset Automation Tooling:
+- **Asset Optimizer & `currentColor` Converter (`scripts/asset_optimizer.py`)**: Pure Python SVGO-style vector optimizer that compresses coordinates, converts monochrome icons to `currentColor` for Tailwind styling, and builds typed `index.ts` icon barrels.
 - **Headless Browser Timeout Bypass (`scripts/headless_render.py`)**: Exports large 1600px+ frames as SVG and renders pixel-perfect PNGs via headless Edge/Chrome, bypassing Figma API raster timeouts (`get_screenshot timeout`).
 - **Geometric Path Hash Deduplication (`scripts/export_pipeline.py`)**: Hashes SVG vector geometries (`d="..."`) to eliminate duplicate icon files regardless of Figma node IDs.
 - **Deep Modal & Sub-Component Detection**: Automatically scans and extracts floating modal overlay containers, KPI metric rings, list actions, and table buttons.

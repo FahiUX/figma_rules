@@ -581,6 +581,17 @@ If a batch export throws `INTERNAL_ERROR: Failed to export node. This node may n
 
 ---
 
+### Step 7: Vector Optimization & `currentColor` Code Handoff (v2.1)
+Run the bundled optimizer to prepare raw Figma SVGs for modern frontend production:
+```bash
+python scripts/asset_optimizer.py "<target-asset-directory>" --current-color
+```
+- **SVGO-Style Coordinate Compaction**: Strips bloated decimals (`11.666666030883789px` -> `11.67px`), cuts redundant empty groups and metadata.
+- **Monochrome `currentColor` Conversion**: Replaces hardcoded hex strokes/fills with `currentColor` so icons dynamically inherit Tailwind text and hover colors (`text-blue-600 hover:text-blue-800`).
+- **Auto-Generated `index.ts` Icon Barrels**: Automatically builds typed PascalCase barrels (`export { default as IconSearch } from './00-icon-search.svg'`) in every icon folder.
+
+---
+
 ## 🔍 Master Quality Assurance (QA) Audit
 
 Run the automated verification script before marking export work complete:
@@ -605,5 +616,6 @@ The auditor validates:
 - [`scripts/figma-layout.js`](scripts/figma-layout.js): Canvas section placer & screen link wire engine (v1).
 - [`scripts/headless_render.py`](scripts/headless_render.py): Fast SVG-to-PNG renderer using headless Edge/Chrome (v2).
 - [`scripts/export_pipeline.py`](scripts/export_pipeline.py): Geometric path hashing & asset classifier (v2).
+- [`scripts/asset_optimizer.py`](scripts/asset_optimizer.py): Pure Python SVGO-style vector optimizer, currentColor transformer & index.ts barrel generator (v2.1).
 - [`scripts/qa_audit.py`](scripts/qa_audit.py): Automated end-to-end quality assurance auditor (v2).
 - [`references/export-naming-conventions.md`](references/export-naming-conventions.md): Detailed naming and classification reference (v2).
