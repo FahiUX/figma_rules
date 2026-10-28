@@ -30,3 +30,18 @@ This repository defines the Figma-Standard UI Architecture and automation script
 3. Call Figma MCP tools (`figma-dev-mode-mcp-server` / `generate_figma_design`) to transfer layout.
 4. Run `figma-sweep.js` on the captured root node to guarantee 100% clean Auto Layout and inspect the audit report.
 5. Run `figma-layout.js` to compute neat section and screen placement on the Figma canvas.
+
+16. **CANONICAL ASSET EXPORT & EXTRACTION STANDARD (v2):**
+    - When extracting assets from Figma, strictly follow the canonical 7-layer hierarchy:
+      - `<screen-slug>.png`: Full frame screenshot (1440 or 1600 px wide).
+      - `00-navigation/`: Sidebar slice + `02-icon/` + `04-logo/` (official logos). Login screens exempt.
+      - `01-header/`: Header slice + `02-icon/` + `03-avatar/` (persona avatar). Login screens exempt.
+      - `02-icon/`: Body UI & modal overlay SVGs with 2-digit zero-padding (`00-icon-{name}.svg`).
+      - `03-avatar/`: Real portraits of humans only (officers, delegates, team). No generic placeholders.
+      - `04-logo/`: Institutional crests, seals, partner & sponsor logos.
+      - `05-banner/`: Floorplans, 3-level venue maps, motorcade routes, dossier preview banners.
+      - `06-vector/`: Pure vector charts (bar/donut charts), sparklines, and KPI metric rings.
+    - **Headless Bypass**: Use `scripts/headless_render.py` (headless Edge/Chrome) to render large frames from SVG to avoid Figma raster timeouts.
+    - **Path Deduplication**: Use `scripts/export_pipeline.py` to hash geometric SVG paths (`d="..."`) and eliminate duplicates.
+    - **Modal Overlays**: Deep-scan sibling floating frames for modal controls, close buttons, and checkboxes.
+    - **QA Verification**: Always run `python scripts/qa_audit.py <path>` to achieve 0 defects.

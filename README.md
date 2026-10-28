@@ -1,15 +1,29 @@
-# Figma-Standard UI Rules 🎨
+# Figma-Standard UI Rules 🎨 (v2)
 
-> **The Figma-First Frontend Architecture for Vibe Coders, Claude Code & Antigravity.**  
-> Code in React/Tailwind that exports into Figma as 100% native, clean Auto Layout frames with zero manual cleanup.
+> **The Bidirectional Figma & Frontend Standard for Vibe Coders, Claude Code & Antigravity.**  
+> - **Part 1 (Code → Figma)**: Code in React/Tailwind that exports into Figma as 100% native, clean Auto Layout frames with zero manual cleanup.  
+> - **Part 2 (Figma → Code & Assets)**: Extract, categorize, deduplicate, and verify 100% of Figma design assets into canonical 7-layer folder structures with headless rendering and automated QA verification.
 
 ---
 
-## The Problem
-When AI agents write frontend code, they use arbitrary CSS: `margin-bottom`, empty spacer `<div>`s, and `display: grid`. When you export that HTML to Figma via `html.to.design`, Claude `html->figma`, or Builder.io, Figma generates un-autolayouted frames, fixed pixel boxes, broken padding, and frozen widths.
+## 🏛️ Two-Way Architecture
 
-## The Solution
-This skill forces AI agents (Claude Code, Antigravity, OpenHands, Codex) to code strictly using **Figma's Auto Layout mental model**:
+```text
+┌─────────────────────────┐          Part 1: Code → Figma          ┌─────────────────────────┐
+│   React / Tailwind UI   │ ─────────────────────────────────────► │    Figma Auto Layout    │
+│  (1440px, Hug, Gap-only)│       (Capture + Sweep + Layout)       │ (Clean native frames)   │
+└─────────────────────────┘                                        └─────────────────────────┘
+             ▲                                                                  │
+             │                    Part 2: Figma → Assets                        │
+             └──────────────────────────────────────────────────────────────────┘
+                               (Headless Render + Path Hash Deduplication + QA)
+```
+
+---
+
+## 🌟 Part 1: Code → Figma (The Auto Layout Standard)
+
+Forces AI agents (Claude Code, Antigravity, OpenHands, Codex) to code strictly using **Figma's Auto Layout mental model**:
 1. **Flexbox First**: `flex-col` (Vertical), `flex-row` (Horizontal), and `flex-wrap` (Wrap). CSS Grid only for card grids with more than 6 cards.
 2. **Gap & Padding Only**: Zero margins (`mb-*`, `mt-*`) and zero spacer divs. Padding only on whitelisted outer containers, canvas (`p-10`), buttons, and badges.
 3. **1440px Desktop Baseline**: Root and canvas resolve balanced with optical hierarchy at 1440px width.
@@ -21,28 +35,61 @@ This skill forces AI agents (Claude Code, Antigravity, OpenHands, Codex) to code
 9. **Post-Capture Sweep & Layout Automation**: 
    - `scripts/figma-sweep.js`: sweeps captured frames, unwrapping converter artifacts and applying Fill × Hug across all texts.
    - `scripts/figma-layout.js`: places screens in neat module sections with automated navigation edge links.
-   - `references/figma-repair-rules.md`: the post-capture repair checklist (Detect + Fix per known breakage), run page-wide after the sweep.
+   - `references/figma-repair-rules.md`: the post-capture repair checklist.
 10. **No Truncation & Code-Faithful Hug**: full text always; Hug vs Fill follows the TSX class (`flex-1` = Fill, `w-fit` = Hug).
+
+---
+
+## 📦 Part 2: Figma → Production Assets (v2 Standard)
+
+Provides automated, zero-defect asset extraction, deduplication, categorization, and QA verification for Figma designs:
+
+### Canonical Folder Hierarchy per Screen:
+```text
+<Category / Section Directory>/
+  └── <Screen Directory Name>/
+        ├── <screen-slug>.png                  # Full frame screenshot (1440 or 1600 px width)
+        │
+        ├── 00-navigation/                     # Sidebar / Left navigation chrome
+        │     ├── 00-navigation.png            # Full rendered sidebar slice
+        │     ├── 02-icon/                     # Navigation icons (zero-padded SVGs)
+        │     └── 04-logo/                     # Official brand & agency logos (PNGs)
+        │
+        ├── 01-header/                         # Topbar / Header chrome
+        │     ├── 01-header.png                # Full rendered header slice
+        │     ├── 02-icon/                     # Header utility icons (search, notif, bell, settings)
+        │     └── 03-avatar/                   # Active user / persona portrait JPEG
+        │
+        ├── 02-icon/                           # Body content & modal overlay icons (SVGs)
+        ├── 03-avatar/                         # Body user / officer / delegate portraits (JPEGs)
+        ├── 04-logo/                           # Partner / sponsor / institution logos (PNGs)
+        ├── 05-banner/                         # Hero banners, venue maps, floorplans, dossiers (JPEGs/PNGs)
+        └── 06-vector/                         # Vector charts, sparklines, metric rings (SVGs)
+```
+
+### v2 Asset Automation Tooling:
+- **Headless Browser Timeout Bypass (`scripts/headless_render.py`)**: Exports large 1600px+ frames as SVG and renders pixel-perfect PNGs via headless Edge/Chrome, bypassing Figma API raster timeouts (`get_screenshot timeout`).
+- **Geometric Path Hash Deduplication (`scripts/export_pipeline.py`)**: Hashes SVG vector geometries (`d="..."`) to eliminate duplicate icon files regardless of Figma node IDs.
+- **Deep Modal & Sub-Component Detection**: Automatically scans and extracts floating modal overlay containers, KPI metric rings, list actions, and table buttons.
+- **Binary Search Error Recovery**: Automatically isolates degenerate 0-size vector nodes (`INTERNAL_ERROR: Failed to export node`) using $O(\log N)$ partitioning without crashing batches.
+- **Master QA Verification Auditor (`scripts/qa_audit.py`)**: Run an automated quality audit across any exported asset directory:
+  ```bash
+  python scripts/qa_audit.py "<path-to-exported-assets>"
+  ```
 
 ---
 
 ## Installation & Setup 🚀
 
 ### 1. Claude Code
-Install globally or inside your workspace:
 ```bash
 # Global install for Claude Code
 npx skills add FahiUX/figma_rules -g
-
-# Or copy into your workspace .claude directory
-mkdir -p .claude/skills/figma-standard-ui
-cp -r /path/to/figma_rules/.claude/skills/figma-standard-ui/* .claude/skills/figma-standard-ui/
 ```
 
 ### 2. Antigravity (AGY CLI / IDE)
-Install into Antigravity's agents skill registry or workspace:
 ```bash
-# Global install
+# Global install for Antigravity
 npx skills add FahiUX/figma_rules -g
 
 # Or copy into Antigravity's global skills directory
@@ -50,28 +97,11 @@ mkdir -p ~/.agents/skills/figma-standard-ui
 cp -r /path/to/figma_rules/.agents/skills/figma-standard-ui/* ~/.agents/skills/figma-standard-ui/
 ```
 
-### 3. Repository Rule (Automatic for All Agents)
-Drop `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` into the root of any repository. Any AI agent working in that repository will immediately follow these rules.
-
----
-
-## HTML → Figma Capture Workflow 📤
-
-1. **Start Dev Server**: Run `npm run dev` or `npx vite --port 5180`.
-2. **Capture at 1440px Viewport**: Use Playwright (`viewport: { width: 1440, height: 900 }`) and Figma MCP capture (`generate_figma_design`).
-3. **Run Sweep Script**: Run `scripts/figma-sweep.js` (via Claude `use_figma` MCP or Antigravity tool) passing the generated `ROOT_ID` and `FONT_FAMILY`.
-4. **Run Canvas Layout Script**: Run `scripts/figma-layout.js` to arrange screens into standardized canvas sections.
-5. **Zero Manual Fixes**: The frame is immediately clean, auto-layouted, and ready for production handoff.
-
----
-
-## Updating to the Latest Rules 🔄
-
-Whenever new rules or sweep optimizations are pushed to GitHub:
+### 3. Update to Latest (v2)
 ```bash
 npx skills update figma-standard-ui -g
 ```
-Or pull the latest repository:
+Or pull directly inside the repository:
 ```bash
-cd ~/.agents/skills/figma-standard-ui && git pull
+git pull origin main
 ```

@@ -1,6 +1,6 @@
 ---
 name: figma-standard-ui
-description: Enforces strict Figma Auto Layout architecture for frontend code (React, TSX, Tailwind, HTML). Ensures all generated UI translates 1:1 into native Figma Auto Layout frames with 1440px desktop baseline, Hug height containers, 40px canvas padding, pixel units, Gap-only spacing, multi-level nesting, absolute badge positioning, wrap rows, column tables, vector charts, no min/max width or height, and Fill x Hug text. Includes the html->figma capture workflow, a required post-capture sweep script (scripts/figma-sweep.js), and a canvas layout formula + script for sections, x/y, gaps and arrow links between screens (scripts/figma-layout.js). Use when building UI meant for Figma handoff, design systems, or html-to-figma exports.
+description: Enforces strict bidirectional Figma Auto Layout architecture & canonical asset extraction (v2). Part 1 (Code -> Figma) translates React/Tailwind/HTML 1:1 into native Auto Layout frames (1440px desktop, Hug height, 40px canvas padding, Gap-only spacing, Column tables, vector charts, scripts/figma-sweep.js and scripts/figma-layout.js). Part 2 (Figma -> Code/Assets) extracts, categorizes, deduplicates, and verifies 100% of Figma assets into canonical 7-layer folder structures (00-nav, 01-header, 02-icon, 03-avatar, 04-logo, 05-banner, 06-vector) with headless Edge/Chrome timeout bypass (scripts/headless_render.py), geometric SVG path hash deduplication (scripts/export_pipeline.py), and automated QA verification (scripts/qa_audit.py).
 ---
 
 # Figma-Standard UI Architecture Skill
@@ -468,3 +468,142 @@ The skill is project-agnostic. Each project records its own values (e.g. in its 
 | **Explicit 1px Dividers** | `<div className="w-full h-px bg-..." />` | Never combine `border-b` with `pb-*` on containers. |
 | **Icon Constraints `LEFT/TOP`** | Square bounding box + `shrink-0` | Prevents vector distortion and flattening upon resize. |
 | **Corner Radius Cap** | Cap `rounded-full` to $\le 9999\text{px}$ | Avoids IEEE float32 overflow (`3.40282e+38`). |
+
+
+---
+
+# 📦 Part 2: Canonical Asset Export Architecture (v2 Standard)
+
+This section establishes the automated, zero-defect standard for extracting design assets from multi-page Figma files into clean, predictable filesystem hierarchies.
+
+---
+
+## 🏛️ The Canonical Asset Folder Formula
+
+Every screen in every page or portal must strictly follow this canonical structure:
+
+```text
+<Category / Section Directory>/
+  └── <Screen Directory Name>/
+        ├── <screen-slug>.png                  # Full frame screenshot (1440 or 1600 px width)
+        │
+        ├── 00-navigation/                     # Sidebar / Left navigation chrome
+        │     ├── 00-navigation.png            # Full rendered sidebar slice
+        │     ├── 02-icon/                     # Navigation icons (zero-padded SVGs)
+        │     └── 04-logo/                     # Official brand & agency logos (PNGs)
+        │
+        ├── 01-header/                         # Topbar / Header chrome
+        │     ├── 01-header.png                # Full rendered header slice
+        │     ├── 02-icon/                     # Header utility icons (search, notif, bell, settings)
+        │     └── 03-avatar/                   # Active user / persona portrait JPEG
+        │
+        ├── 02-icon/                           # Body content & modal overlay icons (SVGs)
+        ├── 03-avatar/                         # Body user / officer / delegate portraits (JPEGs)
+        ├── 04-logo/                           # Partner / sponsor / institution logos (PNGs)
+        ├── 05-banner/                         # Hero banners, venue maps, floorplans, dossiers (JPEGs/PNGs)
+        └── 06-vector/                         # Vector charts, sparklines, metric rings (SVGs)
+```
+
+### 📋 Strict Rules:
+1. **Omit Empty Asset Folders**: Never create empty `03-avatar/`, `04-logo/`, `05-banner/`, or `06-vector/` directories. Only create asset subfolders when matching assets exist.
+2. **Login Screens Are Chrome-Exempt**: Standalone Authentication / Login screens do NOT contain `00-navigation/` or `01-header/`.
+3. **Sequential Zero-Padding**: All files in `02-icon/` and asset folders must use 2-digit zero padding (`00-icon-{name}.svg`, `01-icon-{name}.svg`).
+4. **SVG Only for Icons & Charts**: All UI icons (`02-icon/`) and chart vectors (`06-vector/`) must be clean SVGs.
+5. **Real Portraits in Avatars**: `03-avatar/` is strictly reserved for real photographs of human faces/personas. No abstract icons or UI placeholders.
+
+---
+
+## 🛠️ Extraction Tooling Matrix
+
+| Asset Type | Primary Tool | Format | Why This Tool? |
+| :--- | :--- | :---: | :--- |
+| **Full Screen Screenshots** | `save_screenshots` (SVG) $\rightarrow$ `headless_render.py` | PNG | Bypasses Figma rasterization timeouts (`get_screenshot timeout`) on large 1600px+ artboards. |
+| **Chrome Slices (Nav / Header)** | `save_screenshots` | PNG | Clean raster slices at scale 1. |
+| **UI Icons & Modals** | `save_screenshots` | SVG | Fast, sharp, zero distortion, vector fidelity. |
+| **Avatars, Logos, Banners** | `save_image_fills` | Original JPG/PNG | Extracts original uncompressed source bytes directly behind Figma `IMAGE` fills. |
+| **Charts & Sparklines** | `save_screenshots` | SVG | Pure vector geometry for charts (bar charts, donut charts, sparklines). |
+
+---
+
+## 🚀 Step-by-Step Export Workflow
+
+### Step 1: Canvas Discovery & Screen Cataloging
+1. Navigate to target page: `{ "pageId": "<PAGE_ID>" } -> navigate_to_page`
+2. Search for top-level screens and section containers: `{ "name": " — " } -> search_nodes`
+3. Normalize screen names to filesystem slugs using regex:
+   ```python
+   re.sub(r'[\s\-_·/—\(\)]+', '-', name.strip()).strip('-').lower()
+   ```
+
+### Step 2: Master Chrome Optimization
+1. Identify Master Chrome components (`Sidebar` and `Header` / `Topbar`) for the active user role/portal.
+2. Extract the master chrome slices:
+   - `00-navigation.png` + `02-icon/` + `04-logo/` (official logos).
+   - `01-header.png` + `02-icon/` (utility icons) + `03-avatar/` (role persona portrait).
+3. Replicate the standardized chrome across all non-login screens in that portal.
+
+### Step 3: High-Res Full Frame Rendering (Bypassing Timeouts)
+Large 1600px+ screens or complex multi-layer artboards frequently trigger Figma API raster timeouts.
+**The Headless Bypass**:
+1. Export the frame as SVG via `save_screenshots`:
+   ```json
+   { "nodeIds": ["<FRAME_ID>"], "format": "SVG", "outDir": "_tmp_svg" }
+   ```
+2. Render the SVG to exact pixel-perfect PNG using headless Microsoft Edge or Google Chrome:
+   ```bash
+   python scripts/headless_render.py _tmp_svg/<FRAME_ID>.svg <DEST_DIR>/<screen-slug>.png
+   ```
+
+### Step 4: Body Assets & Modal Overlay Deep Scanning
+Do not stop at top-level content. Scan every child frame and modal:
+1. **Modal Overlays**: Look for sibling frames floating above the main container (e.g. `Container (1600x2085)` over `Container (1600x1989)`). Extract modal action icons, close buttons (`X`), checkboxes, and submit triggers.
+2. **KPI Metric Cards**: Extract KPI metric circular containers into `06-vector/` (`kpi-01.svg` to `kpi-04.svg`).
+3. **Table & Action Icons**: Extract status badges, download icons, and filter buttons into `02-icon/`.
+4. **Original Image Fills**: Extract all `IMAGE` fills via `save_image_fills`. Classify each extracted image:
+   - Portrait / face $\rightarrow$ `03-avatar/{idx:02d}-{name}.jpg`
+   - Institutional seal / crest $\rightarrow$ `04-logo/{idx:02d}-{name}.png`
+   - Venue floorplan / map / dossier preview $\rightarrow$ `05-banner/{idx:02d}-{name}.jpg`
+
+### Step 5: Geometric Path Deduplication
+Before writing icons to `02-icon/`, compute the geometric path hash:
+```python
+from scripts.export_pipeline import get_svg_path_hash
+path_hash = get_svg_path_hash(svg_file)
+if path_hash not in seen_hashes:
+    seen_hashes.add(path_hash)
+```
+
+### Step 6: Binary Search Error Recovery
+If a batch export throws `INTERNAL_ERROR: Failed to export node. This node may not have any visible layers.`, partition the batch in half:
+- If first half succeeds, error is in second half.
+- Recurse in $O(\log N)$ until the single degenerate node ID is identified.
+- Discard the 0-size node and export 100% of remaining valid nodes.
+
+---
+
+## 🔍 Master Quality Assurance (QA) Audit
+
+Run the automated verification script before marking export work complete:
+
+```bash
+python scripts/qa_audit.py "<target-asset-directory>"
+```
+
+The auditor validates:
+- **Root Screen PNGs**: 100% present on all screens.
+- **Navigation Folders**: Present on all non-login screens with verified logo counts.
+- **Header Folders**: Present on all non-login screens with verified persona avatar.
+- **Body Icons**: Zero-padded and deduplicated.
+- **Body Avatars, Logos, Banners, Vectors**: Accurately mapped without orphaned files.
+- **Zero-Defect Scoreboard**: `VERDICT: PASS (0 Issues Detected)`.
+
+---
+
+## 📂 Bundled Helper Scripts (v2)
+
+- [`scripts/figma-sweep.js`](scripts/figma-sweep.js): Post-capture DOM repair & Auto Layout optimizer (v1).
+- [`scripts/figma-layout.js`](scripts/figma-layout.js): Canvas section placer & screen link wire engine (v1).
+- [`scripts/headless_render.py`](scripts/headless_render.py): Fast SVG-to-PNG renderer using headless Edge/Chrome (v2).
+- [`scripts/export_pipeline.py`](scripts/export_pipeline.py): Geometric path hashing & asset classifier (v2).
+- [`scripts/qa_audit.py`](scripts/qa_audit.py): Automated end-to-end quality assurance auditor (v2).
+- [`references/export-naming-conventions.md`](references/export-naming-conventions.md): Detailed naming and classification reference (v2).
