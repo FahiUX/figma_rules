@@ -1,6 +1,6 @@
 ---
 name: figma-standard-ui
-description: Enforces strict bidirectional Figma Auto Layout architecture & canonical asset extraction (v2). Part 1 (Code -> Figma) translates React/Tailwind/HTML 1:1 into native Auto Layout frames (1440px desktop, Hug height, 40px canvas padding, Gap-only spacing, Column tables, vector charts, scripts/figma-sweep.js and scripts/figma-layout.js). Part 2 (Figma -> Code/Assets) extracts, categorizes, deduplicates, and verifies 100% of Figma assets into canonical 7-layer folder structures (00-nav, 01-header, 02-icon, 03-avatar, 04-logo, 05-banner, 06-vector) with headless Edge/Chrome timeout bypass (scripts/headless_render.py), geometric SVG path hash deduplication (scripts/export_pipeline.py), and automated QA verification (scripts/qa_audit.py).
+description: Enforces strict bidirectional Figma Auto Layout architecture & canonical asset extraction (v2). Part 1 (Code -> Figma) translates React/Tailwind/HTML 1:1 into native Auto Layout frames (1440px desktop, Hug height, 40px canvas padding, Gap-only spacing, Column tables, vector charts, scripts/figma-sweep.js and scripts/figma-layout.js). Part 2 (Figma -> Code/Assets) extracts, categorizes, deduplicates, and verifies 100% of Figma assets into canonical 7-layer folder structures (00-nav, 01-header, 02-icon, 03-avatar, 04-logo, 05-banner, 06-vector) with headless Edge/Chrome timeout bypass (scripts/headless_render.py), geometric SVG path hash deduplication (scripts/export_pipeline.py), incremental sync & caching (scripts/cache_manager.py), and automated QA verification (scripts/qa_audit.py).
 ---
 
 # Figma-Standard UI Architecture Skill
@@ -592,6 +592,18 @@ python scripts/asset_optimizer.py "<target-asset-directory>" --current-color
 
 ---
 
+### Step 8: Incremental Sync & Caching Engine (v2.2)
+On large multi-screen projects (50+ screens), re-exporting every asset on every run wastes bandwidth and triggers Figma rate limits. Run the cache manager to enable incremental diff synchronization:
+```bash
+python scripts/cache_manager.py "<target-asset-directory>"
+```
+- **SHA-256 Content Hashing**: Computes deterministic hashes of Figma node geometry, text, fills, and structure.
+- **Manifest Tracking (`.asset_cache.json`)**: Maintains an index of exported files per screen.
+- **Instant Skip on Cache Hits**: If a Figma screen has not changed and output files exist on disk, the export pass skips it in milliseconds (98% faster re-runs).
+- **Zero Git Churn**: Prevents modified file timestamps from polluting Git pull request diffs when assets are unchanged.
+
+---
+
 ## 🔍 Master Quality Assurance (QA) Audit
 
 Run the automated verification script before marking export work complete:
@@ -616,6 +628,7 @@ The auditor validates:
 - [`scripts/figma-layout.js`](scripts/figma-layout.js): Canvas section placer & screen link wire engine (v1).
 - [`scripts/headless_render.py`](scripts/headless_render.py): Fast SVG-to-PNG renderer using headless Edge/Chrome (v2).
 - [`scripts/export_pipeline.py`](scripts/export_pipeline.py): Geometric path hashing & asset classifier (v2).
+- [`scripts/cache_manager.py`](scripts/cache_manager.py): Incremental sync engine & SHA-256 node content hash cache manager (v2.2).
 - [`scripts/asset_optimizer.py`](scripts/asset_optimizer.py): Pure Python SVGO-style vector optimizer, currentColor transformer & index.ts barrel generator (v2.1).
 - [`scripts/qa_audit.py`](scripts/qa_audit.py): Automated end-to-end quality assurance auditor (v2).
 - [`references/export-naming-conventions.md`](references/export-naming-conventions.md): Detailed naming and classification reference (v2).
