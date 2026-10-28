@@ -1,50 +1,55 @@
-# Figma-Standard UI Rules 🎨 (v2)
+# Figma-Standard Suite 🎨
 
-> **The Bidirectional Figma & Frontend Standard for Vibe Coders, Claude Code & Antigravity.**  
-> - **Part 1 (Code → Figma)**: Code in React/Tailwind that exports into Figma as 100% native, clean Auto Layout frames with zero manual cleanup.  
-> - **Part 2 (Figma → Code & Assets)**: Extract, categorize, deduplicate, and verify 100% of Figma design assets into canonical 7-layer folder structures with headless rendering and automated QA verification.
+> **The Complete Two-Way Figma & Frontend Architecture for Claude Code, Antigravity & Vibe Coders.**  
+> Includes two dedicated, standalone skills:  
+> 1. **`/figma-standard-ui` (Code → Figma)**: Code React/Tailwind that translates 1:1 into native Figma Auto Layout frames with zero manual cleanup.  
+> 2. **`/export-figma` (Figma → Assets)**: Extract, categorize, deduplicate, optimize, and QA-verify 100% of Figma design assets into canonical 7-layer folder structures.
 
 ---
 
-## 🏛️ Two-Way Architecture
+## 🏛️ The Two Skills
 
 ```text
-┌─────────────────────────┐          Part 1: Code → Figma          ┌─────────────────────────┐
-│   React / Tailwind UI   │ ─────────────────────────────────────► │    Figma Auto Layout    │
-│  (1440px, Hug, Gap-only)│       (Capture + Sweep + Layout)       │ (Clean native frames)   │
-└─────────────────────────┘                                        └─────────────────────────┘
-             ▲                                                                  │
-             │                    Part 2: Figma → Assets                        │
-             └──────────────────────────────────────────────────────────────────┘
-                               (Headless Render + Path Hash Deduplication + QA)
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           FIGMA-STANDARD SUITE                                  │
+├────────────────────────────────────────┬────────────────────────────────────────┤
+│         1. /figma-standard-ui          │            2. /export-figma            │
+│          (Code ➔ Figma AL)             │          (Figma ➔ Assets)              │
+├────────────────────────────────────────┼────────────────────────────────────────┤
+│ • 1440px Desktop Baseline              │ • Canonical 7-Layer Folder Structure   │
+│ • Height: HUG (no min-h-screen traps)  │ • Headless Edge/Chrome Timeout Bypass  │
+│ • 40px Canvas Padding (p-10)           │ • Geometric SVG Path Hash Dedup        │
+│ • Gap-Only Spacing (Zero Margins)      │ • Deep Modal & Sub-Component Extraction│
+│ • Column-Based Dynamic Tables          │ • SVGO Compaction & currentColor Conv  │
+│ • Pure Vector Charts (No <canvas>)     │ • Incremental Diff Sync (.asset_cache) │
+│ • figma-sweep.js & figma-layout.js     │ • qa_audit.py Zero-Defect Auditor      │
+└────────────────────────────────────────┴────────────────────────────────────────┘
 ```
 
 ---
 
-## 🌟 Part 1: Code → Figma (The Auto Layout Standard)
+## 🎨 Skill 1: `/figma-standard-ui` (Code → Figma)
 
-Forces AI agents (Claude Code, Antigravity, OpenHands, Codex) to code strictly using **Figma's Auto Layout mental model**:
-1. **Flexbox First**: `flex-col` (Vertical), `flex-row` (Horizontal), and `flex-wrap` (Wrap). CSS Grid only for card grids with more than 6 cards.
-2. **Gap & Padding Only**: Zero margins (`mb-*`, `mt-*`) and zero spacer divs. Padding only on whitelisted outer containers, canvas (`p-10`), buttons, and badges.
-3. **1440px Desktop Baseline**: Root and canvas resolve balanced with optical hierarchy at 1440px width.
-4. **Height: HUG**: Containers use `h-auto flex flex-col` (never fixed pixel heights or `min-h-screen`).
-5. **No Min / Max Width or Height**: Zero `max-w-*` (prevents fixed-width freezing in Figma), zero pixel `min-w-*`, `min-h-*`, or `max-h-*`.
-6. **Text Layer Standard: Fill × Hug**: Headings and text declare `w-full self-stretch` (Fit to Fill).
-7. **Column-Based Tables**: Tables structured as Column vertical stacks so dragging column widths in Figma stretches all cells instantly.
-8. **Vector SVG Charts**: Native SVG paths and gradients (no raster `<canvas>`).
-9. **Post-Capture Sweep & Layout Automation**: 
-   - `scripts/figma-sweep.js`: sweeps captured frames, unwrapping converter artifacts and applying Fill × Hug across all texts.
-   - `scripts/figma-layout.js`: places screens in neat module sections with automated navigation edge links.
-   - `references/figma-repair-rules.md`: the post-capture repair checklist.
-10. **No Truncation & Code-Faithful Hug**: full text always; Hug vs Fill follows the TSX class (`flex-1` = Fill, `w-fit` = Hug).
+Forces AI agents to code strictly using **Figma's Auto Layout mental model**:
+1. **Flexbox First**: `flex-col`, `flex-row`, `flex-wrap`. CSS Grid only for card grids of 7+ items.
+2. **Gap & Padding Only**: Zero margins (`mb-*`, `mt-*`); padding only on whitelisted containers.
+3. **1440px Desktop Baseline**: Root canvas resolves with optical balance at 1440px.
+4. **Height: HUG**: Containers use `h-auto flex flex-col`. Never fixed pixel heights.
+5. **No Min/Max Width or Height**: Zero `max-w-*` (prevents frozen widths in Figma).
+6. **Text Layer Standard: Fill × Hug**: Headings and text declare `w-full self-stretch`.
+7. **Column-Based Tables**: Tables structured as column vertical stacks for dynamic width stretching.
+8. **Vector SVG Charts**: Native SVG paths and gradients (no `<canvas>`).
+9. **Automation Scripts**:
+   - `scripts/figma-sweep.js`: Sweeps captured frames, unwrapping converter artifacts and applying Fill × Hug.
+   - `scripts/figma-layout.js`: Places screens in neat module sections with automated navigation edge links.
 
 ---
 
-## 📦 Part 2: Figma → Production Assets (v2 Standard)
+## 📦 Skill 2: `/export-figma` (Figma → Production Assets)
 
-Provides automated, zero-defect asset extraction, deduplication, categorization, and QA verification for Figma designs:
+Provides an automated, zero-defect asset extraction, deduplication, categorization, and QA verification pipeline:
 
-### Canonical Folder Hierarchy per Screen:
+### Canonical 7-Layer Hierarchy per Screen:
 ```text
 <Category / Section Directory>/
   └── <Screen Directory Name>/
@@ -67,17 +72,14 @@ Provides automated, zero-defect asset extraction, deduplication, categorization,
         └── 06-vector/                         # Vector charts, sparklines, metric rings (SVGs)
 ```
 
-### v2 Asset Automation Tooling:
-- **Incremental Sync & Caching Engine (`scripts/cache_manager.py`)**: Maintains a deterministic SHA-256 `.asset_cache.json` manifest. Skips unmodified screens on re-runs (98% faster re-exports), eliminates Git file churn, and protects against Figma API rate limits.
-- **Asset Optimizer & `currentColor` Converter (`scripts/asset_optimizer.py`)**: Pure Python SVGO-style vector optimizer that compresses coordinates, converts monochrome icons to `currentColor` for Tailwind styling, and builds typed `index.ts` icon barrels.
-- **Headless Browser Timeout Bypass (`scripts/headless_render.py`)**: Exports large 1600px+ frames as SVG and renders pixel-perfect PNGs via headless Edge/Chrome, bypassing Figma API raster timeouts (`get_screenshot timeout`).
-- **Geometric Path Hash Deduplication (`scripts/export_pipeline.py`)**: Hashes SVG vector geometries (`d="..."`) to eliminate duplicate icon files regardless of Figma node IDs.
-- **Deep Modal & Sub-Component Detection**: Automatically scans and extracts floating modal overlay containers, KPI metric rings, list actions, and table buttons.
-- **Binary Search Error Recovery**: Automatically isolates degenerate 0-size vector nodes (`INTERNAL_ERROR: Failed to export node`) using $O(\log N)$ partitioning without crashing batches.
-- **Master QA Verification Auditor (`scripts/qa_audit.py`)**: Run an automated quality audit across any exported asset directory:
-  ```bash
-  python scripts/qa_audit.py "<path-to-exported-assets>"
-  ```
+### Automation Tooling:
+- **Headless Browser Timeout Bypass (`scripts/headless_render.py`)**: Exports large frames as SVG and renders pixel-perfect PNGs via headless Edge/Chrome, bypassing Figma rasterization timeouts.
+- **Geometric Path Hash Deduplication (`scripts/export_pipeline.py`)**: Hashes SVG path geometry (`d="..."`) to eliminate duplicate icon files across screens.
+- **Deep Modal & Sub-Component Detection**: Scans floating modal frames, close buttons, checkbox states, and KPI metric containers.
+- **Binary Search Error Recovery**: Isolates degenerate 0-size vector layers in $O(\log N)$ without failing export batches.
+- **Asset Optimizer & `currentColor` (`scripts/asset_optimizer.py`)**: Compresses coordinates, converts monochrome SVGs to `currentColor` for dynamic Tailwind styling, and builds typed `index.ts` icon barrels.
+- **Incremental Sync Engine (`scripts/cache_manager.py`)**: Maintains a deterministic SHA-256 `.asset_cache.json` manifest to skip unchanged screens in milliseconds (98% faster re-runs).
+- **Master QA Verification Auditor (`scripts/qa_audit.py`)**: Runs an automated audit verifying 100% compliance and zero defects.
 
 ---
 
@@ -85,23 +87,24 @@ Provides automated, zero-defect asset extraction, deduplication, categorization,
 
 ### 1. Claude Code
 ```bash
-# Global install for Claude Code
+# Global install (installs both /figma-standard-ui and /export-figma)
 npx skills add FahiUX/figma_rules -g
 ```
 
 ### 2. Antigravity (AGY CLI / IDE)
 ```bash
-# Global install for Antigravity
+# Global install
 npx skills add FahiUX/figma_rules -g
 
 # Or copy into Antigravity's global skills directory
-mkdir -p ~/.agents/skills/figma-standard-ui
-cp -r /path/to/figma_rules/.agents/skills/figma-standard-ui/* ~/.agents/skills/figma-standard-ui/
+mkdir -p ~/.agents/skills
+cp -r /path/to/figma_rules/.agents/skills/* ~/.agents/skills/
 ```
 
-### 3. Update to Latest (v2)
+### 3. Update to Latest
 ```bash
 npx skills update figma-standard-ui -g
+npx skills update export-figma -g
 ```
 Or pull directly inside the repository:
 ```bash
