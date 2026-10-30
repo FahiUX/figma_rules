@@ -27,6 +27,11 @@
 //  8. Retro repairs: `Label:` Hug + value Fill, separators (• · /) Hug, right-hand text of a space-between row Hug, text link + arrow Hug,
 //     egg-shaped circles round again, wrapped chips Hug, off-centre pills centred, table column strokes removed,
 //     Hug text overflowing its parent -> Fill, grey shadow boxes behind text cleared.
+//  8b. Code-layer "Extract designs" repairs (also safe on captures): single-row GRIDs of <= 6 items (grid-cols-2 toggles)
+//     -> HORIZONTAL row with items Fill; Fill text in a centred row (icon + label + arrow buttons) -> Hug;
+//     text followed by a badge -> Hug; children of a free-form frame (Body with a background layer) keep their
+//     captured height; space-between rows stay space-between when both sides fit; rows whose content overflows ->
+//     longest Hug text Fill (wraps).
 //  9. Returns an audit: GRID frames, padded plain frames, off-brand fonts, leftovers (incl. retro checks).
 
 const ROOT_ID = 'ROOT_ID';
@@ -61,7 +66,7 @@ const fonts = new Map();
 for (const t of allTexts()) for (const s of t.getStyledTextSegments(['fontName'])) fonts.set(JSON.stringify(s.fontName), s.fontName);
 await Promise.all([...fonts.values()].map(f => figma.loadFontAsync(f)));
 
-const log = { grids: 0, boxPadded: 0, circles: 0, labels: 0, rightText: 0, separators: 0, links: 0, chips: 0, pillsCentred: 0, colStrokes: 0, overflow: 0, shadowBoxes: 0, radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, untruncated: 0, dotsRounded: 0, fontsFixed: 0, shellFill: 0, heightHug: 0, heightFill: 0 };
+const log = { grids: 0, boxPadded: 0, circles: 0, labels: 0, rightText: 0, separators: 0, links: 0, chips: 0, pillsCentred: 0, colStrokes: 0, overflow: 0, shadowBoxes: 0, radii: 0, minMax: 0, unwrapped: 0, frameFill: 0, textFill: 0, textHug: 0, buttonFill: 0, truncated: 0, untruncated: 0, dotsRounded: 0, fontsFixed: 0, shellFill: 0, heightHug: 0, heightFill: 0, gridRows: 0, centerHug: 0, badgeHug: 0, freeFormKept: 0, spaceBetweenKept: 0, rowOverflow: 0 };
 
 // 1. radii + min/max width + min/max height
 for (const n of [root, ...root.findAll(() => true)]) {
@@ -96,6 +101,18 @@ const isLattice = n => {
   const ks = n.children.filter(c => c.visible);
   return ks.every(k => k.type === 'FRAME' && Math.abs(k.width - ks[0].width) <= 2) && ks[0].width >= 120 && new Set(ks.map(k => Math.round(k.x))).size >= 2;
 };
+// captured single-row GRID (grid-cols-2 toggle, <= 6 items) -> HORIZONTAL row, items Fill (GRID is only for 7+ cards).
+// Runs before the lattice step, so lattices converted below are not touched.
+for (const g of root.findAll(n => n.type === 'FRAME' && n.layoutMode === 'GRID' && n.gridRowCount === 1 && n.children.length <= 6)) {
+  const gap = g.gridColumnGap, ks = [...g.children].sort((a, b) => a.x - b.x);
+  g.layoutMode = 'HORIZONTAL';
+  ks.forEach((k, i) => g.insertChild(i, k));
+  g.itemSpacing = gap;
+  if (isAL(g.parent)) g.layoutSizingHorizontal = 'FILL';
+  g.layoutSizingVertical = 'HUG';
+  for (const k of ks) { k.layoutSizingHorizontal = 'FILL'; k.layoutSizingVertical = 'HUG'; }
+  log.gridRows++;
+}
 for (const g of root.findAll(isLattice)) {
   const ks = g.children.filter(c => c.visible).sort((a, b) => Math.round(a.y) - Math.round(b.y) || a.x - b.x);
   const xs = [...new Set(ks.map(k => Math.round(k.x)))].sort((a, b) => a - b);
@@ -145,6 +162,9 @@ function visit(p) {
         if (k.type !== 'FRAME' || isIcon(k) || k.layoutSizingHorizontal === 'FILL') continue;
         if (k.width >= innerW(p) - 2) { k.layoutSizingHorizontal = 'FILL'; isPill(k) ? log.buttonFill++ : log.frameFill++; }
       }
+    } else if (p.layoutMode === 'HORIZONTAL' && p.primaryAxisAlignItems === 'CENTER') {
+      // centred row (icon + label + arrow button, toggle tab): a Fill text would push the icons to the edges
+      for (const k of kids) if (k.type === 'TEXT' && k.layoutSizingHorizontal === 'FILL') { hugText(k); log.centerHug++; }
     } else if (p.layoutMode === 'HORIZONTAL') {
       const textish = kids.filter(k => !isIcon(k) && !isPill(k) && !isPillGroup(k) &&
         (k.type === 'TEXT' || (k.type === 'FRAME' && !hasPaint(k) && k.findOne(t => t.type === 'TEXT'))));
@@ -187,8 +207,12 @@ const isPadBox = n => isAL(n) && capturedH(n) <= 64 && n.paddingTop + n.paddingB
 const hFrames = [root, ...root.findAll(n => isAL(n) && n.visible && n.layoutPositioning !== 'ABSOLUTE')].filter(isAL);
 // pass 1, leaves first: reset every container (Fixed OR converter Fill) to Hug, so each one measures its real content.
 // A converter Fill (flex-1 / h-full) inside a Hug parent otherwise collapses the whole page to the sidebar height.
+// A child of a free-form frame (layoutMode NONE, e.g. a Body holding an absolute background layer) has no auto layout
+// parent to stretch it: its captured height IS its height (flex-1 main area that centres a card). Keep it.
+const freeFormChild = n => n !== root && n.parent && n.parent.type === 'FRAME' && n.parent.layoutMode === 'NONE';
+for (const n of hFrames) if (freeFormChild(n) && n.layoutSizingVertical === 'FIXED') log.freeFormKept++;
 for (const n of hFrames.slice().reverse())
-  if (n.layoutSizingVertical !== 'HUG' && n.children.length && !keepFixedH(n) && !(isAL(n.parent) && keepFixedH(n.parent))) {
+  if (n.layoutSizingVertical !== 'HUG' && n.children.length && !keepFixedH(n) && !(isAL(n.parent) && keepFixedH(n.parent)) && !freeFormChild(n)) {
     if (isPadBox(n)) {
       const content = Math.max(...n.children.filter(c => c.visible && c.layoutPositioning !== 'ABSOLUTE').map(c => c.height));
       const slack = Math.round(capturedH(n) - content);
@@ -273,8 +297,24 @@ for (const t of allTexts()) {
   // right-hand short text of a 2-child space-between row Hugs, so the gap stays
   if (p.primaryAxisAlignItems === 'SPACE_BETWEEN' && p.children.length === 2 && p.children[1] === t && t.layoutSizingHorizontal === 'FILL' && t.characters.length <= 40) { hugText(t); log.rightText++; }
 }
-for (const r of root.findAll(n => isAL(n) && n.layoutMode === 'HORIZONTAL' && n.primaryAxisAlignItems === 'SPACE_BETWEEN' && n.children.some(c => c.layoutSizingHorizontal === 'FILL')))
-  { r.primaryAxisAlignItems = 'MIN'; r.itemSpacing = Math.max(r.itemSpacing, 16); } // a Fill side cancels space-between: keep a real gap
+// text followed by a badge (name + "Consortium SSO" chip): the text Hugs so the badge stays next to it
+for (const t of allTexts()) {
+  const p = t.parent;
+  if (!isAL(p) || p.layoutMode !== 'HORIZONTAL' || t.layoutSizingHorizontal !== 'FILL') continue;
+  const nx = p.children[p.children.indexOf(t) + 1];
+  if (nx && nx.type === 'FRAME' && hasPaint(nx) && typeof nx.cornerRadius === 'number' && nx.cornerRadius >= 8 && nx.height <= 32) { hugText(t); log.badgeHug++; }
+}
+// a Fill side cancels space-between. Label + value row: if both fit at their natural width, Hug the label and keep
+// space-between (a forced 16px gap pushes a tight row into wrapping). Otherwise MIN with a real gap.
+for (const r of root.findAll(n => isAL(n) && n.layoutMode === 'HORIZONTAL' && n.primaryAxisAlignItems === 'SPACE_BETWEEN' && n.children.some(c => c.layoutSizingHorizontal === 'FILL'))) {
+  const [a, b] = r.children;
+  if (r.children.length === 2 && a.type === 'TEXT' && a.layoutSizingHorizontal === 'FILL' && b.layoutSizingHorizontal !== 'FILL') {
+    hugText(a);
+    if (a.width + b.width + 8 <= innerW(r)) { log.spaceBetweenKept++; continue; }
+    fillText(a);
+  }
+  r.primaryAxisAlignItems = 'MIN'; r.itemSpacing = Math.max(r.itemSpacing, 16);
+}
 // text link + arrow/icon: text Hug and row Hug so the arrow stays next to the text
 for (const b of root.findAll(n => isAL(n) && n.layoutMode === 'HORIZONTAL' && n.name.startsWith('Button') && !hasPaint(n) && !inShell(n) && n.children.length >= 2 && n.children.some(c => c.type === 'TEXT' && c.layoutSizingHorizontal === 'FILL'))) {
   for (const c of b.children) if (c.type === 'TEXT') hugText(c);
@@ -289,7 +329,7 @@ for (const c of root.findAll(n => n.type === 'FRAME' && n.layoutSizingHorizontal
 // chips whose one short text wrapped: Hug on one line
 for (const c of root.findAll(n => isAL(n) && hasPaint(n) && n.height <= 48 && !/input|area/i.test(n.name))) {
   const ts = c.children.filter(k => k.type === 'TEXT');
-  if (ts.length !== 1 || c.children.length > 3 || ts[0].characters.length > 25 || oneLine(ts[0])) continue;
+  if (ts.length !== 1 || c.children.length > 3 || ts[0].characters.length > 40 || oneLine(ts[0])) continue; // 40: badges like "AUTHENTICATED (CORPORATE SSO)"
   hugText(ts[0]); if (c.layoutSizingHorizontal !== 'FILL') c.layoutSizingHorizontal = 'HUG'; log.chips++;
 }
 // fixed-width single-line pills: centre the content
@@ -307,6 +347,14 @@ for (const t of tables) for (const c of t.children) if (c.strokes.length) { c.st
 // Hug text wider than its parent's inner width -> Fill (wraps inside the parent)
 for (const t of allTexts().filter(t => isAL(t.parent) && t.parent.layoutSizingHorizontal !== 'HUG' && t.layoutSizingHorizontal === 'HUG' && !inPill(t) && !inTableCell(t) &&
   t.width > t.parent.width - t.parent.paddingLeft - t.parent.paddingRight + 1)) { fillText(t); log.overflow++; }
+// row whose content (icon + Hug text) is wider than the row: the longest Hug text Fills and wraps (error banners)
+for (const row of root.findAll(n => isAL(n) && n.layoutMode === 'HORIZONTAL' && n.layoutSizingHorizontal !== 'HUG')) {
+  const ks = row.children.filter(k => k.visible && k.layoutPositioning !== 'ABSOLUTE');
+  const used = ks.reduce((s, k) => s + k.width, 0) + row.itemSpacing * Math.max(0, ks.length - 1);
+  if (used <= innerW(row) + 1) continue;
+  const t = ks.filter(k => k.type === 'TEXT' && k.layoutSizingHorizontal === 'HUG' && !inPill(k)).sort((a, b) => b.width - a.width)[0];
+  if (t) { fillText(t); log.rowOverflow++; }
+}
 // grey box behind text: ~0-opacity fill + drop shadow (captured text-shadow)
 for (const b of root.findAll(n => n.type === 'FRAME' && n.effects.some(e => e.type === 'DROP_SHADOW' && e.visible) && n.fills.length > 0 &&
   n.fills.every(f => (f.opacity ?? 1) <= 0.05) && n.findAll(() => true).every(k => k.type === 'TEXT' || k.type === 'FRAME'))) { b.fills = []; b.effects = []; log.shadowBoxes++; }
@@ -316,7 +364,7 @@ const isCardSection = n => { const p = n.parent; return p && p.type === 'FRAME' 
 const texts = allTexts();
 const audit = {
   gridFrames: root.findAll(n => n.type === 'FRAME' && n.layoutMode === 'GRID').map(n => n.id),
-  fixedHeightContainers: [root, ...root.findAll(n => isAL(n) && n.visible)].filter(n => isAL(n) && n.layoutSizingVertical === 'FIXED' && !keepFixedH(n) && !inTableCell(n)).map(n => `${n.id} ${n.name} ${Math.round(n.height)}`),
+  fixedHeightContainers: [root, ...root.findAll(n => isAL(n) && n.visible)].filter(n => isAL(n) && n.layoutSizingVertical === 'FIXED' && !keepFixedH(n) && !inTableCell(n) && !freeFormChild(n)).map(n => `${n.id} ${n.name} ${Math.round(n.height)}`),
   minMaxLeft: [root, ...root.findAll(() => true)].filter(n => ['minWidth','maxWidth','minHeight','maxHeight'].some(k => k in n && n[k] != null)).map(n => n.id),
   paddedPlainFrames: root.findAll(n => isAL(n) && !hasPaint(n) && pad(n) > 0 && !n.name.startsWith('Button') && !isCardSection(n)).map(n => `${n.id} ${n.name} [${n.paddingTop},${n.paddingRight},${n.paddingBottom},${n.paddingLeft}]`),
   offBrandFonts: fontSet ? [...new Set(texts.flatMap(t => t.getStyledTextSegments(['fontName']).map(s => s.fontName.family)))].filter(f => f !== FONT_FAMILY) : 'FONT_FAMILY not set',
