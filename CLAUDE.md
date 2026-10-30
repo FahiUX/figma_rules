@@ -24,8 +24,9 @@ This repository defines the Figma-Standard UI Architecture and automation script
 9. **Retro rules**: circles square, no table column strokes, capture every state, frame gap 500, prototype DISSOLVE 150 ms. Full list: `SKILL.md` + `references/figma-repair-rules.md`.
 
 ## Capture Workflow for Claude
-1. Start dev server (`npm run dev` or `npx vite --port 5180`).
-2. Capture at 1440px viewport using Playwright + `generate_figma_design` MCP tool.
+0. **Ask the user which import route**: (A) html->figma capture, or (B) Figma code layer -> Extract designs (beta, runs in a signed-in browser). Details: SKILL.md "Step 0: Choose the Import Route".
+1. Route A: start dev server (`npm run dev` or `npx vite --port 5180`). Route B: import the repo as a code layer with `send_code_to_figma`.
+2. Route A: capture at 1440px viewport using Playwright + `generate_figma_design`. Route B: set the code layer W = 1440, click through each state, Extract designs -> Current state.
 3. Execute `scripts/figma-sweep.js` using Claude's `use_figma` MCP tool with the resulting node id.
 4. Execute `scripts/figma-layout.js` to arrange screens into standardized canvas sections with navigation edge links.
 5. Audit output to ensure clean export.

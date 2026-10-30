@@ -1,6 +1,6 @@
 ---
 name: figma-standard-ui
-description: Enforces strict bidirectional Figma Auto Layout architecture & canonical asset extraction (v2). Part 1 (Code -> Figma) translates React/Tailwind/HTML 1:1 into native Auto Layout frames (1440px desktop, Hug height, 40px canvas padding, Gap-only spacing, Column tables, vector charts, scripts/figma-sweep.js and scripts/figma-layout.js). Part 2 (Figma -> Code/Assets) extracts, categorizes, deduplicates, and verifies 100% of Figma assets into canonical 7-layer folder structures (00-nav, 01-header, 02-icon, 03-avatar, 04-logo, 05-banner, 06-vector) with headless Edge/Chrome timeout bypass (scripts/headless_render.py), geometric SVG path hash deduplication (scripts/export_pipeline.py), incremental sync & caching (scripts/cache_manager.py), and automated QA verification (scripts/qa_audit.py).
+description: Enforces strict bidirectional Figma Auto Layout architecture & canonical asset extraction (v2). Part 1 (Code -> Figma) translates React/Tailwind/HTML 1:1 into native Auto Layout frames (1440px desktop, Hug height, 40px canvas padding, Gap-only spacing, Column tables, vector charts, scripts/figma-sweep.js and scripts/figma-layout.js). Part 2 (Figma -> Code/Assets) extracts, categorizes, deduplicates, and verifies 100% of Figma assets into canonical 7-layer folder structures (00-nav, 01-header, 02-icon, 03-avatar, 04-logo, 05-banner, 06-vector) with headless Edge/Chrome timeout bypass (scripts/headless_render.py), geometric SVG path hash deduplication (scripts/export_pipeline.py), incremental sync & caching (scripts/cache_manager.py), and automated QA verification (scripts/qa_audit.py). Code -> Figma has two import routes the user chooses between each time: html->figma capture, or Figma code layer -> Extract designs.
 ---
 
 # Figma-Standard UI Architecture Skill
@@ -377,13 +377,30 @@ The shell is captured with every screen, so its violations show up on every scre
 ## 🤖 Claude Code & Antigravity
 - **Claude Code** loads this skill from `.claude/skills/figma-standard-ui/` (or `~/.claude/skills/`) and runs the scripts with the Figma MCP `use_figma` tool (load `figma-use` first).
 - **Antigravity** loads it from `.agents/skills/figma-standard-ui/`, `GEMINI.md` or `.agents/rules/figma-auto-layout-standard.md`, renders with Playwright at 1440px and runs the same scripts through its Figma MCP tool.
-- Both follow the capture workflow below, unchanged.
+- Both follow the import workflow below, unchanged.
 
 ---
 
-## 📤 html → Figma Capture Workflow (Required)
+## 🔀 Step 0: Choose the Import Route (Ask the User Every Time)
 
-Every screen goes into Figma through the **html->figma capture** (Figma MCP `generate_figma_design`), followed by the sweep. Never hand-build a screen that exists in code.
+Two routes bring coded screens into Figma. Both end in the same sweep + canvas layout. **Before importing, ask the user which route to use**, offering both options with a one-line trade-off (the user is still comparing them):
+
+| Route | How | Trade-off |
+|---|---|---|
+| **A. html → Figma capture** | Figma MCP `generate_figma_design` from a local dev server (workflow below) | Fully scriptable, no browser login needed. Known cleanup: staging padding baked in, SVG text captured as Inter. |
+| **B. Code layer → Extract designs** | Import the repo as a Figma **code layer**, click through each state inside it, extract each state as frames | Real auto layout, real fonts, vector icons, less cleanup. Figma beta: Extract is a UI button (no API), so it runs in a browser where the user is signed in to Figma; may use AI credits. |
+
+**Route B steps** (when the user picks it):
+1. **Import.** Copy the repo to a scratch folder (never edit the real repo), add the four executable scripts `.figma/make/{install,dev,deploy-preview,deploy}` (Vite: `npm ci` / `exec npx vite --port "$PORT" --host "${FIGMA_DEV_SERVER_HOST:-0.0.0.0}" --strictPort` / `npm run build -- --base ./` + `figma make deploy[-preview] --build-dir dist`), exclude `node_modules .git dist` and tool state, archive, then upload with the Figma MCP `send_code_to_figma` (create a design-file code layer; follow the tool's returned upload steps).
+2. **Set the width.** Select the code layer and set W = 1440 (the desktop baseline) before extracting.
+3. **Extract each state.** In a visible, persistent Playwright browser the user signs in to Figma (never type their password). The preview iframe is `*-figmacachedpreview.figma.site`; there are two, so drive the one **on the canvas** (bounding box not at 0,0). The canvas blocks pointer clicks: use `el.click()` via evaluate and `locator.fill`. Reach each state by real clicks only, then click **Extract designs → Current state**. A transient state (a 1.5s success message) must be extracted right after `waitFor` its text. `window.figma` works in that tab for renaming and checking text.
+4. Continue at step 4 below (sweep, audit, repair checklist, canvas layout). The sweep includes the Extract-specific repairs (single-row GRID toggles, centred rows, text + badge, free-form Body heights, space-between rows, overflowing rows).
+
+---
+
+## 📤 html → Figma Capture Workflow (Route A)
+
+With route A, every screen goes into Figma through the **html->figma capture** (Figma MCP `generate_figma_design`), followed by the sweep. Never hand-build a screen that exists in code.
 
 1. **Dev server serves your latest code.** Confirm the served module contains your change (e.g. `curl localhost:<port>/src/...tsx | grep <new component>`) before capturing. If it is stale, see Troubleshooting.
 2. **Page height is Hug.** No `h-screen overflow-y-auto` on the main column; the document itself must scroll, or the capture is cut at 900px.

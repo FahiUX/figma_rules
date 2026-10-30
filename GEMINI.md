@@ -25,6 +25,7 @@ This repository defines the Figma-Standard UI Architecture and automation script
 9. **Retro rules**: circles square, no table column strokes, capture every state, frame gap 500, prototype DISSOLVE 150 ms. Full list: `SKILL.md` + `references/figma-repair-rules.md`.
 
 ## Capture Workflow for Antigravity
+0. **Ask the user which import route**: (A) html->figma capture (steps below), or (B) Figma code layer -> Extract designs (beta, runs in a signed-in browser; see SKILL.md "Step 0: Choose the Import Route"). Both continue at the sweep step.
 1. Start dev server (`npm run dev` or `npx vite --port 5180`).
 2. Verify visual output using Playwright (`playwright-cli` or CLI runner) at 1440px.
 3. Call Figma MCP tools (`figma-dev-mode-mcp-server` / `generate_figma_design`) to transfer layout.

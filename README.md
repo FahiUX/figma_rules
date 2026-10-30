@@ -42,6 +42,7 @@ Forces AI agents to code strictly using **Figma's Auto Layout mental model**:
 9. **Automation Scripts**:
    - `scripts/figma-sweep.js`: Sweeps captured frames, unwrapping converter artifacts and applying Fill × Hug.
    - `scripts/figma-layout.js`: Places screens in neat module sections with automated navigation edge links.
+10. **Two Import Routes (agent asks every time)**: **A. HTML → Figma capture** (`generate_figma_design` from a local dev server) or **B. Figma code layer → Extract designs** (beta: import the repo with `send_code_to_figma`, set W = 1440, click through each state, Extract designs → Current state). Both continue with the sweep + layout scripts.
 
 ---
 
